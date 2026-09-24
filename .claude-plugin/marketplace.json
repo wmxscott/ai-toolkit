@@ -29,6 +29,12 @@
       "source": "./plugins/prod-guard",
       "description": "Runs a prompt against a production cloud account under a read-only guard that lasts for the rest of the conversation",
       "category": "security"
+    },
+    {
+      "name": "chat-style",
+      "source": "./plugins/chat-style",
+      "description": "Chat output style: Claude as a thinking partner for ideation, architecture and exploratory discussion, rather than a task executor",
+      "category": "productivity"
     }
   ]
 }

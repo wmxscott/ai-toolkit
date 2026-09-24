@@ -14,6 +14,7 @@ The repository is a Claude Code plugin marketplace, and a Codex one for the plug
 | [git-sync](plugins/git-sync) | Fast-forwards the current git branch to its upstream before work starts, and stops when it has diverged | ✓ | ✓ | | |
 | [statusline](plugins/statusline) | Three-line NerdFont statusline: git, model, effort, context, cost and rate limits, in Catppuccin colours that follow the system theme | ✓ | | | |
 | [prod-guard](plugins/prod-guard) | Runs a prompt against a production cloud account under a read-only guard that lasts for the rest of the conversation | ✓ | | | |
+| [chat-style](plugins/chat-style) | Chat output style: Claude as a thinking partner for ideation, architecture and exploratory discussion, rather than a task executor | ✓ | | | |
 
 ## Install
 
