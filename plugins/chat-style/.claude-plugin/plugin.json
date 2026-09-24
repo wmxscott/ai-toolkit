@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "chat-style",
+  "description": "Chat output style: Claude as a thinking partner for ideation, architecture and exploratory discussion, rather than a task executor",
+  "author": {
+    "name": "wmxscott"
+  },
+  "homepage": "https://github.com/wmxscott/ai-toolkit/tree/main/plugins/chat-style",
+  "repository": "https://github.com/wmxscott/ai-toolkit",
+  "license": "MIT",
+  "keywords": ["output-style", "chat", "brainstorming", "architecture", "discussion"]
+}

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "prod-guard",
+  "description": "Runs a prompt against a production cloud account under a read-only guard that lasts for the rest of the conversation",
+  "author": {
+    "name": "wmxscott"
+  },
+  "homepage": "https://github.com/wmxscott/ai-toolkit/tree/main/plugins/prod-guard",
+  "repository": "https://github.com/wmxscott/ai-toolkit",
+  "license": "MIT",
+  "keywords": ["production", "cloud", "read-only", "safety", "aws", "gcp", "azure", "cloudflare"]
+}

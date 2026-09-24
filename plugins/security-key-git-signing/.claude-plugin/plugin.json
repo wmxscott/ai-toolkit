@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "security-key-git-signing",
+  "description": "Checks a hardware security key is plugged in before git signs a commit or tag with GPG, and asks for it if not",
+  "author": {
+    "name": "wmxscott"
+  },
+  "homepage": "https://github.com/wmxscott/ai-toolkit/tree/main/plugins/security-key-git-signing",
+  "repository": "https://github.com/wmxscott/ai-toolkit",
+  "license": "MIT",
+  "keywords": ["git", "gpg", "signing", "yubikey", "smart-card", "security-key"]
+}

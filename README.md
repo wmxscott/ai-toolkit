@@ -13,6 +13,9 @@ The repository is a Claude Code plugin marketplace, and a Codex one for the plug
 | [terminal-title](plugins/terminal-title) | Titles the terminal tab after the current task, in Herdr, tmux or any xterm-compatible terminal | ✓ | | | |
 | [git-sync](plugins/git-sync) | Fast-forwards the current git branch to its upstream before work starts, and stops when it has diverged | ✓ | ✓ | | |
 | [statusline](plugins/statusline) | Three-line NerdFont statusline: git, model, effort, context, cost and rate limits, in Catppuccin colours that follow the system theme | ✓ | | | |
+| [prod-guard](plugins/prod-guard) | Runs a prompt against a production cloud account under a read-only guard that lasts for the rest of the conversation | ✓ | | | |
+| [chat-style](plugins/chat-style) | Chat output style: Claude as a thinking partner for ideation, architecture and exploratory discussion, rather than a task executor | ✓ | | | |
+| [security-key-git-signing](plugins/security-key-git-signing) | Checks a hardware security key is plugged in before git signs a commit or tag with GPG, and asks for it if not | ✓ | ✓ | | |
 | [theme-sync](plugins/theme-sync) | Switches Claude Code between its light and dark themes the moment the macOS appearance changes | ✓ | | | |
 
 ## Install
