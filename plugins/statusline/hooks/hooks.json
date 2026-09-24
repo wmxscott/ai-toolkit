@@ -1,0 +1,17 @@
+{
+  "description": "Keep a stable path to the current version's statusline script, so settings.json survives plugin updates",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/link_statusline.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

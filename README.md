@@ -12,6 +12,7 @@ The repository is a Claude Code plugin marketplace, and a Codex one for the plug
 |---|---|:-:|:-:|:-:|:-:|
 | [terminal-title](plugins/terminal-title) | Titles the terminal tab after the current task, in Herdr, tmux or any xterm-compatible terminal | ✓ | | | |
 | [git-sync](plugins/git-sync) | Fast-forwards the current git branch to its upstream before work starts, and stops when it has diverged | ✓ | ✓ | | |
+| [statusline](plugins/statusline) | Three-line NerdFont statusline: git, model, effort, context, cost and rate limits, in Catppuccin colours that follow the system theme | ✓ | | | |
 
 ## Install
 
