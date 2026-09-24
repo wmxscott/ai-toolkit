@@ -23,6 +23,12 @@
       "source": "./plugins/statusline",
       "description": "Three-line NerdFont statusline: git, model, effort, context, cost and rate limits, in Catppuccin colours that follow the system theme",
       "category": "productivity"
+    },
+    {
+      "name": "theme-sync",
+      "source": "./plugins/theme-sync",
+      "description": "Switches Claude Code between its light and dark themes the moment the macOS appearance changes",
+      "category": "productivity"
     }
   ]
 }
