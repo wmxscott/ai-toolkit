@@ -1,0 +1,4 @@
+# stack_overlap.py runs on any python3 from 3.8; diff_census.py needs 3.11 for tomllib.
+extend = "../../pyproject.toml"
+cache-dir = "../../.ruff_cache"
+per-file-target-version = { "skills/authoring-stacked-plans/scripts/stack_overlap.py" = "py38" }

@@ -4,7 +4,7 @@
 
 Small plugins for AI coding agents. Each plugin does one thing and installs on its own.
 
-The repository is a Claude Code plugin marketplace, and a Codex one for the plugins marked below. Support for Codex, Pi and OpenCode is added per plugin where the feature makes sense there.
+The repository is a Claude Code plugin marketplace, a Codex one, and a Pi and OpenCode package, each for the plugins marked below. Support for Codex, Pi and OpenCode is added per plugin where the feature makes sense there.
 
 ## Plugins
 
@@ -16,6 +16,7 @@ The repository is a Claude Code plugin marketplace, and a Codex one for the plug
 | [prod-guard](plugins/prod-guard) | Runs a prompt against a production cloud account under a read-only guard that lasts for the rest of the conversation | ✓ | | | |
 | [chat-style](plugins/chat-style) | Chat output style: Claude as a thinking partner for ideation, architecture and exploratory discussion, rather than a task executor | ✓ | | | |
 | [security-key-git-signing](plugins/security-key-git-signing) | Checks a hardware security key is plugged in before git signs a commit or tag with GPG, and asks for it if not | ✓ | ✓ | | |
+| [stacked-planning](plugins/stacked-planning) | Plans and lands work that spans several pull requests as ordered stacks, with a PR size gate and a stack overlap check | ✓ | ✓ | ✓ | ✓ |
 
 ## Install
 
@@ -45,6 +46,28 @@ Or add the marketplace as above, then pick the plugin in `/plugins` inside a ses
 
 To update, run `codex plugin marketplace upgrade ai-toolkit`, then `codex plugin add <plugin>@ai-toolkit` again.
 
+### Pi
+
+The repository is a [Pi package](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md) that exposes the skills of every plugin with a Pi tick, and nothing else:
+
+```sh
+pi install git:github.com/wmxscott/ai-toolkit
+```
+
+`pi update` picks up new versions. To load only some plugins, filter the package's `skills` in `~/.pi/agent/settings.json`.
+
+### OpenCode
+
+The repository is also an [OpenCode plugin](https://opencode.ai/docs/plugins/) that registers the same skills. Add it to `opencode.json`, then restart OpenCode:
+
+```json
+{
+  "plugin": ["ai-toolkit@git+https://github.com/wmxscott/ai-toolkit.git"]
+}
+```
+
+OpenCode caches the install. If a restart doesn't pick up a new version, clear its package cache (`~/.cache/opencode`).
+
 ## Layout
 
 ```
@@ -53,6 +76,8 @@ To update, run `codex plugin marketplace upgrade ai-toolkit`, then `codex plugin
 plugins/<name>/                   one plugin, self-contained
   .claude-plugin/plugin.json      its Claude Code manifest
   plugin.json                     its Codex manifest, if it supports Codex
+package.json                      the Pi package: lists each Pi and OpenCode plugin's skills
+.opencode/plugins/ai-toolkit.js   the OpenCode plugin: registers those same skills
   README.md                       what it does and how to use it
   tests/                          its tests
 tests/                            checks across the whole repository

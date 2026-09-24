@@ -1,0 +1,15 @@
+{
+  "name": "ai-toolkit",
+  "private": true,
+  "description": "Plugins for AI coding agents",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wmxscott/ai-toolkit.git"
+  },
+  "type": "module",
+  "main": ".opencode/plugins/ai-toolkit.js",
+  "pi": {
+    "skills": ["./plugins/stacked-planning/skills"]
+  }
+}
