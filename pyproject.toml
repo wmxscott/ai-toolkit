@@ -1,0 +1,22 @@
+[project]
+name = "ai-toolkit"
+version = "0.0.0"
+description = "Dev tooling for the ai-toolkit plugin marketplace"
+requires-python = ">=3.11"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6", "shellcheck-py>=0.10"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "plugins"]
+addopts = ["--strict-markers", "--import-mode=importlib"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
