@@ -21,7 +21,7 @@ First match wins:
 |---|---|
 | Herdr (`$HERDR_TAB_ID` set) | The pane, and the tab too when it's the only pane in it |
 | tmux (`$TMUX` set) | The window. Automatic renaming is turned off for it, so the shell doesn't rename it back |
-| Anything else | The terminal window or tab, via an OSC escape sequence. Works in Ghostty, iTerm2, Terminal.app, Alacritty and other xterm-compatible terminals |
+| Anything else | The terminal window or tab, via an OSC escape sequence written to `/dev/tty`, never stdout. Skipped when there's no terminal. Works in Ghostty, iTerm2, Terminal.app, Alacritty and other xterm-compatible terminals |
 
 Control characters are stripped and titles are cut to 80 characters.
 

@@ -30,7 +30,7 @@ The script picks the right target on its own, first match wins:
 
 - Inside Herdr (`$HERDR_TAB_ID` set) — renames the Herdr pane, and the tab too when this is its only pane. The terminal itself is left alone.
 - Inside tmux (`$TMUX` set) — renames the tmux window via `tmux rename-window`. The terminal itself is left alone.
-- Otherwise — sets the terminal window/tab title directly via an OSC escape sequence. Works in Ghostty, iTerm2, Terminal.app, Alacritty, and other xterm-compatible terminals.
+- Otherwise — sets the terminal window/tab title directly by writing an OSC escape sequence to `/dev/tty` (skipped when there is no terminal). Works in Ghostty, iTerm2, Terminal.app, Alacritty, and other xterm-compatible terminals.
 
 Exits silently if no title is given, or if it's empty after sanitization (fail-safe — never blocks on this).
 

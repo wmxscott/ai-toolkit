@@ -14,7 +14,9 @@ def context(sandbox, plugin_root=PLUGIN):
         script_dir=plugin_root / "scripts",
     )
     output = json.loads(result.stdout)
+    assert set(output) == {"hookSpecificOutput"}
     assert output["hookSpecificOutput"]["hookEventName"] == "SessionStart"
+    assert sandbox.written() == b""
     return output["hookSpecificOutput"]["additionalContext"]
 
 

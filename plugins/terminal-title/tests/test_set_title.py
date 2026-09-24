@@ -3,6 +3,7 @@ import pytest
 
 def assert_untouched(sandbox, result):
     assert result.stdout == b""
+    assert sandbox.written() == b""
     assert sandbox.calls() == []
     assert not (sandbox.home / ".cache").exists()
 
@@ -17,21 +18,35 @@ def test_empty_title_is_a_noop(sandbox, args):
     assert_untouched(sandbox, sandbox.run("set_title.sh", *args))
 
 
-def test_osc_fallback(sandbox):
+def test_osc_fallback_writes_to_the_tty_not_stdout(sandbox):
     result = sandbox.run("set_title.sh", "login bug")
-    assert result.stdout == sandbox.osc("login bug")
+    assert result.stdout == b""
+    assert sandbox.written() == sandbox.osc("login bug")
     assert sandbox.calls() == []
 
 
+def test_osc_fallback_is_silent_without_a_tty(sandbox, tmp_path):
+    sandbox.env["TERMINAL_TITLE_TTY"] = str(tmp_path / "missing" / "tty")
+    result = sandbox.run("set_title.sh", "login bug")
+    assert (result.returncode, result.stdout, result.stderr) == (0, b"", b"")
+
+
+def test_default_tty_without_a_controlling_terminal_is_silent(sandbox):
+    del sandbox.env["TERMINAL_TITLE_TTY"]
+    result = sandbox.run("set_title.sh", "login bug", new_session=True)
+    assert (result.returncode, result.stdout, result.stderr) == (0, b"", b"")
+
+
 def test_strips_control_characters_and_truncates(sandbox):
-    result = sandbox.run("set_title.sh", "log\x1bin\t\x07bug\n" + "x" * 100)
-    assert result.stdout == sandbox.osc("loginbug" + "x" * 72)
+    sandbox.run("set_title.sh", "log\x1bin\t\x07bug\n" + "x" * 100)
+    assert sandbox.written() == sandbox.osc("loginbug" + "x" * 72)
 
 
 def test_tmux(sandbox):
     sandbox.tmux(pane="%7")
     result = sandbox.run("set_title.sh", "auth flow")
     assert result.stdout == b""
+    assert sandbox.written() == b""
     assert sandbox.calls() == [
         ["tmux", "set-window-option", "-t", "%7", "automatic-rename", "off"],
         ["tmux", "rename-window", "-t", "%7", "auth flow"],
@@ -50,6 +65,7 @@ def test_herdr_solo_pane_renames_pane_and_tab(sandbox):
     sandbox.tmux()
     result = sandbox.run("set_title.sh", "login bug")
     assert result.stdout == b""
+    assert sandbox.written() == b""
     assert sandbox.calls() == [
         ["herdr", "tab", "get", "t1"],
         ["herdr", "pane", "rename", "p1", "login bug"],

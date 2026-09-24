@@ -12,7 +12,8 @@ def session_start(session_id="s1", source="startup", **extra):
 def test_prime_sets_a_random_placeholder(sandbox):
     titles = set()
     for _ in range(20):
-        out = sandbox.run("prime_title.sh", stdin=session_start()).stdout
+        assert sandbox.run("prime_title.sh", stdin=session_start()).stdout == b""
+        out = sandbox.written()
         assert out.startswith(b"\x1b]0;")
         assert out.endswith(b"\x07")
         title = out[4:-1].decode()
@@ -29,6 +30,7 @@ def test_prime_backs_off_when_session_has_a_title(sandbox):
     sandbox.herdr()
     result = sandbox.run("prime_title.sh", stdin=session_start(source="compact"))
     assert result.stdout == b""
+    assert sandbox.written() == b""
     assert sandbox.calls() == []
 
 
@@ -36,7 +38,7 @@ def test_prime_and_restore_round_trip(sandbox):
     sandbox.herdr(tab="t1", pane="p1")
     sandbox.env["CLAUDE_CODE_SESSION_ID"] = "s1"
 
-    sandbox.run("prime_title.sh", stdin=session_start())
+    assert sandbox.run("prime_title.sh", stdin=session_start()).stdout == b""
     placeholder = sandbox.cached("s1").read_text()
     assert PLACEHOLDER.fullmatch(placeholder)
 
@@ -48,7 +50,8 @@ def test_prime_and_restore_round_trip(sandbox):
     assert sandbox.calls() == []
 
     sandbox.env.update(HERDR_TAB_ID="t2", HERDR_PANE_ID="p9")
-    sandbox.run("restore_title.sh", stdin=session_start(source="resume"))
+    result = sandbox.run("restore_title.sh", stdin=session_start(source="resume"))
+    assert result.stdout == b""
     assert sandbox.calls() == [
         ["herdr", "tab", "get", "t2"],
         ["herdr", "pane", "rename", "p9", "login bug"],
@@ -82,4 +85,5 @@ def test_restore_noops(sandbox, case):
 
     result = sandbox.run("restore_title.sh", stdin=stdin)
     assert result.stdout == b""
+    assert sandbox.written() == b""
     assert sandbox.calls() == []

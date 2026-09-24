@@ -29,6 +29,7 @@ class Sandbox:
         self.home = root / "home"
         self.bin = root / "bin"
         self.log = root / "calls.log"
+        self.tty = root / "tty"
         self.home.mkdir()
         self.bin.mkdir()
         jq = shutil.which("jq")
@@ -38,7 +39,9 @@ class Sandbox:
             "HOME": str(self.home),
             "PATH": f"{self.bin}:/usr/bin:/bin",
             "STUB_LOG": str(self.log),
+            "TERMINAL_TITLE_TTY": str(self.tty),
         }
+        self.tty.touch()
 
     def stub(self, name: str) -> None:
         path = self.bin / name
@@ -53,7 +56,7 @@ class Sandbox:
         self.stub("tmux")
         self.env.update(TMUX="/tmp/tmux-test/default,1,0", TMUX_PANE=pane)
 
-    def run(self, script, *args, stdin=None, script_dir=SCRIPTS):
+    def run(self, script, *args, stdin=None, script_dir=SCRIPTS, new_session=False):
         if isinstance(stdin, dict):
             stdin = json.dumps(stdin)
         return subprocess.run(
@@ -63,6 +66,7 @@ class Sandbox:
             capture_output=True,
             check=True,
             timeout=10,
+            start_new_session=new_session,
         )
 
     def calls(self) -> list[list[str]]:
@@ -76,6 +80,9 @@ class Sandbox:
     @staticmethod
     def osc(title: str) -> bytes:
         return b"\x1b]0;" + title.encode() + b"\x07"
+
+    def written(self) -> bytes:
+        return self.tty.read_bytes()
 
     def cached(self, session_id: str) -> Path:
         return self.home / ".cache" / "claude-terminal-title" / session_id

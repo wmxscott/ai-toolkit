@@ -48,4 +48,10 @@ if [ -n "$TMUX" ] && command -v tmux >/dev/null 2>&1; then
     exit 0
 fi
 
-printf '\033]0;%s\007' "$TITLE"
+# Straight to the terminal: hooks and the Bash tool capture stdout.
+# TERMINAL_TITLE_TTY overrides the target, for tests.
+TTY="${TERMINAL_TITLE_TTY:-/dev/tty}"
+if [ -w "$TTY" ]; then
+    { printf '\033]0;%s\007' "$TITLE" > "$TTY"; } 2>/dev/null
+fi
+exit 0
