@@ -1,0 +1,17 @@
+{
+  "description": "Sync the theme file and start the appearance watcher if it isn't already running",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/session_start.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

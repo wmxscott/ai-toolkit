@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "theme-sync",
+  "description": "Switches Claude Code between its light and dark themes the moment the macOS appearance changes",
+  "author": {
+    "name": "wmxscott"
+  },
+  "homepage": "https://github.com/wmxscott/ai-toolkit/tree/main/plugins/theme-sync",
+  "repository": "https://github.com/wmxscott/ai-toolkit",
+  "license": "MIT",
+  "keywords": ["theme", "dark-mode", "light-mode", "appearance", "macos"]
+}
