@@ -1,0 +1,4 @@
+# The scripts run on the python3 that ships with macOS, which is 3.9.
+extend = "../../pyproject.toml"
+target-version = "py39"
+cache-dir = "../../.ruff_cache"

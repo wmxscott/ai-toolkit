@@ -11,6 +11,7 @@ The repository is a Claude Code plugin marketplace. Support for Codex, Pi and Op
 | Plugin | What it does | Claude Code | Codex | Pi | OpenCode |
 |---|---|:-:|:-:|:-:|:-:|
 | [terminal-title](plugins/terminal-title) | Titles the terminal tab after the current task, in Herdr, tmux or any xterm-compatible terminal | ✓ | | | |
+| [statusline](plugins/statusline) | Three-line NerdFont statusline: git, model, effort, context, cost and rate limits, in Catppuccin colours that follow the system theme | ✓ | | | |
 
 ## Install
 

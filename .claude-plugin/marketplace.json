@@ -11,6 +11,12 @@
       "source": "./plugins/terminal-title",
       "description": "Titles the terminal tab after the current task, in Herdr, tmux or any xterm-compatible terminal",
       "category": "productivity"
+    },
+    {
+      "name": "statusline",
+      "source": "./plugins/statusline",
+      "description": "Three-line NerdFont statusline: git, model, effort, context, cost and rate limits, in Catppuccin colours that follow the system theme",
+      "category": "productivity"
     }
   ]
 }
