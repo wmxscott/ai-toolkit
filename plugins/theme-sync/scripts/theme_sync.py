@@ -131,7 +131,7 @@ def ps(fields: str, pids: list[int]) -> list[str]:
         return []
     try:
         result = subprocess.run(
-            ["ps", "-o", fields, "-p", ",".join(map(str, pids))],
+            ["ps", "-ww", "-o", fields, "-p", ",".join(map(str, pids))],
             stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,

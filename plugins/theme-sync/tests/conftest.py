@@ -139,7 +139,7 @@ class Sandbox:
 
     def watchers(self):
         out = subprocess.run(
-            ["ps", "-A", "-o", "pid=,args="], capture_output=True, text=True, check=True
+            ["ps", "-A", "-ww", "-o", "pid=,args="], capture_output=True, text=True, check=True
         ).stdout
         marker = f"theme_sync.py watch {self.root}"
         pids = []
