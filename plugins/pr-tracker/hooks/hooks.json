@@ -1,0 +1,38 @@
+{
+  "description": "Record the pull requests this session opens, and deliver changes to their checks and reviews, through the pr-tracker CLI",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hook.sh\" post-bash",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*github.*__create_pull_request",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hook.sh\" post-mcp",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hook.sh\" stop",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

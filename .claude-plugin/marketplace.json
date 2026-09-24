@@ -53,6 +53,12 @@
       "source": "./plugins/theme-sync",
       "description": "Switches Claude Code between its light and dark themes the moment the macOS appearance changes",
       "category": "productivity"
+    },
+    {
+      "name": "pr-tracker",
+      "source": "./plugins/pr-tracker",
+      "description": "Tracks the pull requests a session opens and tells it when their checks or reviews change, through the pr-tracker CLI",
+      "category": "development"
     }
   ]
 }

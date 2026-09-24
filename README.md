@@ -18,6 +18,7 @@ The repository is a Claude Code plugin marketplace, a Codex one, and a Pi and Op
 | [security-key-git-signing](plugins/security-key-git-signing) | Checks a hardware security key is plugged in before git signs a commit or tag with GPG, and asks for it if not | ✓ | ✓ | | |
 | [stacked-planning](plugins/stacked-planning) | Plans and lands work that spans several pull requests as ordered stacks, with a PR size gate and a stack overlap check | ✓ | ✓ | ✓ | ✓ |
 | [theme-sync](plugins/theme-sync) | Switches Claude Code between its light and dark themes the moment the macOS appearance changes | ✓ | | | |
+| [pr-tracker](plugins/pr-tracker) | Tracks the pull requests a session opens and tells it when their checks or reviews change, through the [pr-tracker](https://github.com/wmxscott/pr-tracker) CLI | ✓ | | | |
 
 ## Install
 
