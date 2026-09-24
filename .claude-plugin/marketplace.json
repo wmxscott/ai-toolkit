@@ -43,6 +43,12 @@
       "category": "development"
     },
     {
+      "name": "stacked-planning",
+      "source": "./plugins/stacked-planning",
+      "description": "Plans and lands work that spans several pull requests as ordered stacks, with a PR size gate and a stack overlap check",
+      "category": "development"
+    },
+    {
       "name": "theme-sync",
       "source": "./plugins/theme-sync",
       "description": "Switches Claude Code between its light and dark themes the moment the macOS appearance changes",

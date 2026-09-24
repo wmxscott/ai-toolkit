@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "stacked-planning",
+  "description": "Plans and lands work that spans several pull requests as ordered stacks, with a PR size gate and a stack overlap check",
+  "author": {
+    "name": "wmxscott"
+  },
+  "homepage": "https://github.com/wmxscott/ai-toolkit/tree/main/plugins/stacked-planning",
+  "repository": "https://github.com/wmxscott/ai-toolkit",
+  "license": "MIT",
+  "keywords": ["planning", "stacked-prs", "pull-requests", "code-review", "worktrees"]
+}

@@ -11,15 +11,18 @@ A public plugin marketplace for AI coding agents, named `ai-toolkit`. Claude Cod
 ```
 .claude-plugin/marketplace.json   Claude Code marketplace, one entry per plugin
 .agents/plugins/marketplace.json  Codex marketplace, one entry per Codex plugin
+package.json                      Pi package: `pi.skills` lists each Pi/OpenCode plugin's skills
+.opencode/plugins/ai-toolkit.js   OpenCode plugin: adds those same skill directories
 plugins/<name>/
   .claude-plugin/plugin.json      Claude Code plugin manifest
   plugin.json                     Codex plugin manifest, only if the plugin supports Codex
   skills/<skill>/SKILL.md         skills, if any
+  skills/<skill>/scripts/         files a skill runs, if it must work outside Claude Code
   hooks/hooks.json                hooks, if any (loaded automatically; don't list it in plugin.json)
   scripts/                        scripts used by hooks and skills
   README.md                       user-facing docs
   tests/                          pytest tests for this plugin
-tests/                            repository-wide checks (marketplace consistency, Codex manifests)
+tests/                            repository-wide checks (marketplace, Codex, Pi and OpenCode)
 scripts/validate.sh               validates the marketplace and every plugin
 pyproject.toml                    dev tooling only (pytest, ruff, shellcheck), managed with uv
 ```
@@ -30,7 +33,7 @@ pyproject.toml                    dev tooling only (pytest, ruff, shellcheck), m
 2. Add an entry to `.claude-plugin/marketplace.json`: `name`, `source: "./plugins/<name>"`, `description`.
 3. Add a row to the plugin table in `README.md`, marking which agents it supports.
 4. Write `plugins/<name>/README.md` and tests in `plugins/<name>/tests/`.
-5. Reference bundled files through `${CLAUDE_PLUGIN_ROOT}` (hooks, skills) or `${CLAUDE_SKILL_DIR}` (skills). Never hard-code an install path: the plugin is copied into a versioned cache directory that changes on every update.
+5. Reference bundled files through `${CLAUDE_PLUGIN_ROOT}` (hooks, skills) or `${CLAUDE_SKILL_DIR}` (skills). Never hard-code an install path: the plugin is copied into a versioned cache directory that changes on every update. A skill that other agents load must not use either variable: see "Pi and OpenCode support".
 6. Run everything under "Checks" below.
 
 `tests/test_marketplace.py` fails if a plugin directory, its marketplace entry and its README row get out of sync.
@@ -48,6 +51,20 @@ The two manifests don't collide. Claude Code reads only `.claude-plugin/`. Codex
 Leave `version` out of both manifests (the tests require them to agree). Codex then reports the plugin as `1.0.0`, but `codex plugin add` still recopies it on reinstall.
 
 `tests/test_codex.py` checks the Codex marketplace and manifests: schema, entry shape, agreement with the Claude manifest, and the README column.
+
+## Pi and OpenCode support
+
+Pi and OpenCode have no marketplace; both load plain [Agent Skills](https://agentskills.io/specification) and nothing else from this repository. So a plugin supports both or neither, and only when its skills work without Claude-only parts. Such a plugin must support Codex too.
+
+1. Add `./plugins/<name>/skills` to `pi.skills` in the root `package.json`. That list is what `pi install git:github.com/wmxscott/ai-toolkit` loads, and `.opencode/plugins/ai-toolkit.js` (the package's `main`, loaded through `"plugin": ["ai-toolkit@git+https://github.com/wmxscott/ai-toolkit.git"]`) reads the same list into OpenCode's `skills.paths`. Keep the package `private`, with no dependencies, and add no root `skills/`, `extensions/`, `prompts/` or `themes/`: Pi would load them from every install.
+2. Tick the Pi and OpenCode columns in the `README.md` table, and give the plugin's README an install section per agent.
+3. Make the skills portable:
+   - Frontmatter is `name` (the directory name) and `description` (at most 1024 characters, strict YAML: no `: ` in a plain scalar, or a strict parser drops the skill).
+   - Reference bundled files relative to the skill's own directory, and say so in the skill: "`scripts/` is relative to the directory holding this `SKILL.md`". Every agent reports that directory when it loads a skill: Claude Code and OpenCode print "Base directory for this skill", Codex and Pi give the `SKILL.md` path. None of the others expands `${CLAUDE_PLUGIN_ROOT}` or `${CLAUDE_SKILL_DIR}`, and in a shell an unset variable turns the path into a wrong one silently. For a command, use a placeholder such as `<scripts>` that the skill defines once; run literally, it fails loudly.
+   - A file shared by several skills lives in one of them and the others reach it as `../<skill>/...`. Pi and OpenCode load the skills in place and Claude Code and Codex copy the whole plugin, so sibling paths hold in all four.
+   - Run scripts through their interpreter (`uv run --script x.py`, `python3 x.py`) rather than relying on the executable bit.
+
+`tests/test_agents.py` checks the package, the OpenCode module, that Claude, Codex and Pi load the same skills, and the README columns.
 
 ## Checks
 
