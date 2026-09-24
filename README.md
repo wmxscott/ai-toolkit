@@ -4,13 +4,14 @@
 
 Small plugins for AI coding agents. Each plugin does one thing and installs on its own.
 
-The repository is a Claude Code plugin marketplace. Support for Codex, Pi and OpenCode is added per plugin where the feature makes sense there.
+The repository is a Claude Code plugin marketplace, and a Codex one for the plugins marked below. Support for Codex, Pi and OpenCode is added per plugin where the feature makes sense there.
 
 ## Plugins
 
 | Plugin | What it does | Claude Code | Codex | Pi | OpenCode |
 |---|---|:-:|:-:|:-:|:-:|
 | [terminal-title](plugins/terminal-title) | Titles the terminal tab after the current task, in Herdr, tmux or any xterm-compatible terminal | ✓ | | | |
+| [git-sync](plugins/git-sync) | Fast-forwards the current git branch to its upstream before work starts, and stops when it has diverged | ✓ | ✓ | | |
 
 ## Install
 
@@ -27,12 +28,27 @@ Or from inside a session: `/plugin marketplace add wmxscott/ai-toolkit`, then `/
 
 `claude plugin marketplace update ai-toolkit` picks up new versions.
 
+### Codex
+
+Installs without the TUI:
+
+```sh
+codex plugin marketplace add wmxscott/ai-toolkit
+codex plugin add <plugin>@ai-toolkit
+```
+
+Or add the marketplace as above, then pick the plugin in `/plugins` inside a session. Start a new thread to load it.
+
+To update, run `codex plugin marketplace upgrade ai-toolkit`, then `codex plugin add <plugin>@ai-toolkit` again.
+
 ## Layout
 
 ```
-.claude-plugin/marketplace.json   the marketplace: one entry per plugin
+.claude-plugin/marketplace.json   the Claude Code marketplace: one entry per plugin
+.agents/plugins/marketplace.json  the Codex marketplace: one entry per Codex plugin
 plugins/<name>/                   one plugin, self-contained
-  .claude-plugin/plugin.json      its manifest
+  .claude-plugin/plugin.json      its Claude Code manifest
+  plugin.json                     its Codex manifest, if it supports Codex
   README.md                       what it does and how to use it
   tests/                          its tests
 tests/                            checks across the whole repository
@@ -49,7 +65,7 @@ Issues and pull requests are welcome. Development needs [uv](https://docs.astral
 uv run pytest
 uv run ruff check && uv run ruff format --check
 git ls-files -co --exclude-standard '*.sh' | xargs uv run shellcheck
-scripts/validate.sh                 # needs the claude CLI and jq
+scripts/validate.sh                 # needs the claude CLI and jq; uses codex too if installed
 ```
 
 [CLAUDE.md](CLAUDE.md) has the conventions, including how to add a plugin.

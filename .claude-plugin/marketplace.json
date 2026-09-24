@@ -11,6 +11,12 @@
       "source": "./plugins/terminal-title",
       "description": "Titles the terminal tab after the current task, in Herdr, tmux or any xterm-compatible terminal",
       "category": "productivity"
+    },
+    {
+      "name": "git-sync",
+      "source": "./plugins/git-sync",
+      "description": "Fast-forwards the current git branch to its upstream before work starts, and stops when it has diverged",
+      "category": "development"
     }
   ]
 }

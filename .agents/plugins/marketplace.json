@@ -1,0 +1,20 @@
+{
+  "name": "ai-toolkit",
+  "interface": {
+    "displayName": "ai-toolkit"
+  },
+  "plugins": [
+    {
+      "name": "git-sync",
+      "source": {
+        "source": "local",
+        "path": "./plugins/git-sync"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}
