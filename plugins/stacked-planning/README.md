@@ -1,5 +1,8 @@
 # stacked-planning
 
+> [!WARNING]
+> **Experimental.** The skills, the plan format and the gates' configuration may still change in ways that break existing plans and configs. Expect rough edges, and review what the agent plans and lands before relying on it.
+
 Plans and lands work that is too big for one pull request. The work is split into stacks of small PRs, each stack a linear chain, written down as a plan before the first PR. The agent then implements the plan one PR at a time, with every PR checked against a size gate and, when two stacks run at once, an overlap gate.
 
 ## Skills
