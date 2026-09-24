@@ -1,21 +1,18 @@
 import json
 import os
 import stat
-import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 
-SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
+macos = pytest.mark.skipif(sys.platform != "darwin", reason="theme-sync runs on macOS only")
 
 
 @pytest.fixture
-def home(tmp_path, stubs, monkeypatch):
+def home(tmp_path, monkeypatch):
     path = tmp_path / "home"
     path.mkdir()
     monkeypatch.setenv("HOME", str(path))
-    monkeypatch.setenv("PATH", f"{stubs}:/usr/bin:/bin")
     monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
     monkeypatch.delenv("CLAUDE_THEME_SYNC_THEME", raising=False)
     return path
@@ -27,82 +24,39 @@ def trigger(home, value):
     path.write_text(value)
 
 
-def appearance(home, dark):
-    (home / "appearance").write_text("Dark" if dark else "")
-
-
 @pytest.fixture
-def darwin(monkeypatch, ts):
-    monkeypatch.setattr(ts.sys, "platform", "darwin")
+def theme(home):
+    return home / ".claude" / "themes" / "theme-sync.json"
 
 
-def test_override_wins_over_everything(ts, home, darwin, monkeypatch):
+def test_override_wins_over_the_trigger(ts, home, monkeypatch):
     trigger(home, "dark")
-    appearance(home, True)
     monkeypatch.setenv("CLAUDE_THEME_SYNC_THEME", " Light ")
-    assert ts.resolve() == "light"
+    assert ts.override_theme() == "light"
 
 
 @pytest.mark.parametrize("value", ["", "blue", "auto"])
-def test_unusable_override_is_ignored(ts, home, darwin, monkeypatch, value):
-    trigger(home, "light")
+def test_unusable_override_is_ignored(ts, home, monkeypatch, value):
     monkeypatch.setenv("CLAUDE_THEME_SYNC_THEME", value)
-    assert ts.resolve() == "light"
+    assert ts.override_theme() is None
 
 
 @pytest.mark.parametrize(("content", "expected"), [("light", "light"), ("dark\n", "dark")])
-def test_trigger_file_wins_over_macos(ts, home, darwin, content, expected):
-    appearance(home, expected == "light")
+def test_trigger_file(ts, home, content, expected):
     trigger(home, content)
-    assert ts.resolve() == expected
+    assert ts.trigger_theme() == expected
 
 
-def test_unreadable_trigger_falls_through_to_macos(ts, home, darwin):
-    trigger(home, "sepia")
-    appearance(home, False)
-    assert ts.resolve() == "light"
-
-
-@pytest.mark.parametrize(("dark", "expected"), [(True, "dark"), (False, "light")])
-def test_macos_appearance(ts, home, darwin, dark, expected):
-    appearance(home, dark)
-    assert ts.resolve() == expected
-
-
-def test_defaults_missing_means_dark(ts, home, darwin, monkeypatch, tmp_path):
-    monkeypatch.setenv("PATH", str(tmp_path / "nowhere"))
-    assert ts.resolve() == "dark"
-
-
-def test_not_macos_means_dark(ts, home, monkeypatch):
-    monkeypatch.setattr(ts.sys, "platform", "linux")
-    appearance(home, False)
-    assert ts.resolve() == "dark"
-
-
-def test_sync_command_prints_and_writes(home):
-    trigger(home, "light")
-    env = {"HOME": str(home), "PATH": os.environ["PATH"]}
-    out = subprocess.run(
-        [sys.executable, str(SCRIPTS / "theme_sync.py"), "sync"],
-        env=env,
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout
-    assert out == "light\n"
-    theme = home / ".claude" / "themes" / "theme-sync.json"
-    assert json.loads(theme.read_text()) == {"name": "Theme sync", "base": "light"}
+@pytest.mark.parametrize("content", [None, "", "sepia"])
+def test_no_usable_trigger_means_no_theme(ts, home, content):
+    if content is not None:
+        trigger(home, content)
+    assert ts.trigger_theme() is None
 
 
 def test_theme_path_honours_claude_config_dir(ts, home, monkeypatch, tmp_path):
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "config"))
     assert ts.theme_path() == str(tmp_path / "config" / "themes" / "theme-sync.json")
-
-
-@pytest.fixture
-def theme(home):
-    return home / ".claude" / "themes" / "theme-sync.json"
 
 
 def test_sync_creates_the_file_and_folder(ts, theme):
@@ -164,24 +118,15 @@ def test_sync_keeps_file_permissions(ts, theme):
     assert stat.S_IMODE(theme.stat().st_mode) == 0o600
 
 
-def test_live_clients_forgets_dead_and_reused_pids(ts, tmp_path):
-    data = tmp_path / "data"
-    assert ts.register(str(data), os.getpid())
-    dead = subprocess.Popen(["true"])
-    dead.wait()
-    (data / "clients" / str(dead.pid)).write_text("Mon Jan  1 00:00:00 2024\n")
-    reused = subprocess.Popen(["sleep", "30"])
-    try:
-        (data / "clients" / str(reused.pid)).write_text("Mon Jan  1 00:00:00 2024\n")
-        assert ts.live_clients(str(data)) == 1
-        assert sorted(p.name for p in (data / "clients").iterdir()) == [str(os.getpid())]
-    finally:
-        reused.kill()
-        reused.wait()
+def test_register_records_the_start_time(ts, tmp_path):
+    assert ts.register(str(tmp_path), os.getpid())
+    recorded = (tmp_path / "clients" / str(os.getpid())).read_text().strip()
+    assert recorded == ts.start_times([os.getpid()])[os.getpid()]
 
 
-def test_live_clients_without_a_data_dir(ts, tmp_path):
-    assert ts.live_clients(str(tmp_path / "missing")) == 0
+def test_register_skips_a_dead_pid(ts, tmp_path):
+    assert not ts.register(str(tmp_path), 99999)
+    assert not (tmp_path / "clients").exists()
 
 
 def test_lock_is_exclusive(ts, tmp_path):
@@ -192,3 +137,26 @@ def test_lock_is_exclusive(ts, tmp_path):
     again = ts.try_lock(str(tmp_path))
     assert again is not None
     os.close(again)
+
+
+@pytest.mark.parametrize("platform", ["linux", "win32"])
+def test_start_and_watch_are_silent_no_ops_off_macos(ts, home, theme, monkeypatch, platform):
+    monkeypatch.setattr(ts.sys, "platform", platform)
+    trigger(home, "dark")
+    theme.parent.mkdir(parents=True)
+    theme.write_text('{"base": "light"}')
+    data = home / "data"
+    assert ts.start(str(data)) == 0
+    assert ts.watch(str(data)) == 0
+    assert json.loads(theme.read_text()) == {"base": "light"}
+    assert not data.exists()
+
+
+@macos
+def test_start_without_theme_monitor_does_nothing(ts, home, theme):
+    theme.parent.mkdir(parents=True)
+    theme.write_text('{"base": "light"}')
+    data = home / "data"
+    assert ts.start(str(data)) == 0
+    assert json.loads(theme.read_text()) == {"base": "light"}
+    assert not data.exists()

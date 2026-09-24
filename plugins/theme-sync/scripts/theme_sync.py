@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""Keep the Claude Code theme `custom:theme-sync` in step with the macOS appearance.
+"""Keep the Claude Code theme `custom:theme-sync` in step with theme-monitor.
 
   theme_sync.py start DATA_DIR   sync once, then make sure a watcher is running
   theme_sync.py watch DATA_DIR   the watcher itself; `start` launches it
-  theme_sync.py sync             sync once and print the theme
 
-The theme comes from the first of: $CLAUDE_THEME_SYNC_THEME, theme-monitor's
-trigger file, `defaults read -g AppleInterfaceStyle`, then dark.
+The theme comes from $CLAUDE_THEME_SYNC_THEME, else theme-monitor's trigger
+file. With neither, nothing happens. macOS only: anywhere else both commands
+are silent no-ops.
 
 One watcher runs per data dir. It holds an exclusive lock on DATA_DIR/watcher.pid
-for its whole life, and exits once every Claude Code process registered in
-DATA_DIR/clients has ended, or the theme file has been deleted.
+for its whole life and sleeps in kqueue until the trigger file changes, a
+registered Claude Code process exits, or a client registers in DATA_DIR/clients.
+It exits once no registered client is left, or when the theme file, the data
+dir or theme-monitor's folder goes away.
 """
 
 from __future__ import annotations
@@ -19,6 +21,7 @@ import contextlib
 import fcntl
 import json
 import os
+import select
 import subprocess
 import sys
 import tempfile
@@ -29,12 +32,16 @@ SETTING = f"custom:{SLUG}"
 NAME = "Theme sync"
 THEMES = ("dark", "light")
 OVERRIDE_ENV = "CLAUDE_THEME_SYNC_THEME"
-TICK_ENV = "CLAUDE_THEME_SYNC_TICK"
 PIDFILE = "watcher.pid"
 CLIENTS = "clients"
-DEFAULTS_EVERY = 2
-LIVENESS_EVERY = 5
 SHELLS = {"sh", "bash", "zsh", "dash", "ksh", "mksh", "fish", "tcsh", "csh", "nu", "env"}
+# Editors that save by moving the old file aside leave the theme file missing
+# for a moment; only a deletion that lasts this long stops the watcher.
+THEME_GRACE = 2.0
+
+
+def supported() -> bool:
+    return sys.platform == "darwin" and hasattr(select, "kqueue")
 
 
 def config_dir() -> str:
@@ -64,27 +71,6 @@ def trigger_theme() -> str | None:
             return normalise(f.read(64))
     except OSError:
         return None
-
-
-def macos_theme() -> str | None:
-    if sys.platform != "darwin":
-        return None
-    try:
-        result = subprocess.run(
-            ["defaults", "read", "-g", "AppleInterfaceStyle"],
-            stdin=subprocess.DEVNULL,
-            capture_output=True,
-            text=True,
-            timeout=2,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return None
-    # The key only exists in dark mode, so a failed read means light.
-    return "dark" if result.returncode == 0 and result.stdout.strip() == "Dark" else "light"
-
-
-def resolve() -> str:
-    return override_theme() or trigger_theme() or macos_theme() or "dark"
 
 
 def atomic_write(path: str, text: str) -> None:
@@ -171,6 +157,7 @@ def find_client() -> int | None:
 
 
 def register(data: str, pid: int) -> bool:
+    """Record a client with its start time. The rename also wakes a running watcher."""
     started = start_times([pid]).get(pid)
     if not started:
         return False
@@ -178,31 +165,6 @@ def register(data: str, pid: int) -> bool:
     os.makedirs(clients, exist_ok=True)
     atomic_write(os.path.join(clients, str(pid)), started + "\n")
     return True
-
-
-def live_clients(data: str) -> int:
-    """Count registered clients still running, forgetting the rest. A reused pid doesn't count."""
-    clients = os.path.join(data, CLIENTS)
-    try:
-        names = [n for n in os.listdir(clients) if n.isdigit()]
-    except OSError:
-        return 0
-    recorded = {}
-    for name in names:
-        try:
-            with open(os.path.join(clients, name), encoding="utf-8") as f:
-                recorded[int(name)] = f.read().strip()
-        except OSError:
-            pass
-    running = start_times(sorted(recorded))
-    alive = 0
-    for pid, started in recorded.items():
-        if running.get(pid) == started:
-            alive += 1
-        else:
-            with contextlib.suppress(OSError):
-                os.unlink(os.path.join(clients, str(pid)))
-    return alive
 
 
 def try_lock(data: str) -> int | None:
@@ -234,12 +196,17 @@ def spawn_watcher(data: str) -> None:
 
 
 def start(data: str) -> int:
-    """SessionStart: sync once and make sure a watcher is running. Does nothing before setup."""
-    if not os.path.isabs(data) or not os.path.isfile(theme_path()):
+    """SessionStart: sync once and make sure a watcher is running."""
+    if not supported() or not os.path.isabs(data) or not os.path.isfile(theme_path()):
         return 0
-    sync(resolve())
-    if override_theme():
+    override = override_theme()
+    if override:
+        sync(override)
         return 0
+    theme = trigger_theme()
+    if theme is None:
+        return 0
+    sync(theme)
     pid = find_client()
     if pid is None or not register(data, pid):
         return 0
@@ -251,14 +218,6 @@ def start(data: str) -> int:
     os.close(fd)
     spawn_watcher(data)
     return 0
-
-
-def tick() -> float:
-    try:
-        value = float(os.environ.get(TICK_ENV, ""))
-    except ValueError:
-        return 1.0
-    return max(value, 0.01) if value > 0 else 1.0
 
 
 def acquire(data: str) -> int | None:
@@ -275,43 +234,217 @@ def release(fd: int) -> None:
     os.close(fd)
 
 
-def wanted(data: str) -> bool:
-    return os.path.isfile(theme_path()) and live_clients(data) > 0
+class Stop(Exception):
+    pass
+
+
+FILE_EVENTS = (
+    select.KQ_NOTE_WRITE
+    | select.KQ_NOTE_EXTEND
+    | select.KQ_NOTE_ATTRIB
+    | select.KQ_NOTE_DELETE
+    | select.KQ_NOTE_RENAME
+    | select.KQ_NOTE_REVOKE
+    if supported()
+    else 0
+)
+DIR_EVENTS = (
+    select.KQ_NOTE_WRITE | select.KQ_NOTE_DELETE | select.KQ_NOTE_RENAME | select.KQ_NOTE_REVOKE
+    if supported()
+    else 0
+)
+GONE = select.KQ_NOTE_DELETE | select.KQ_NOTE_RENAME | select.KQ_NOTE_REVOKE if supported() else 0
+O_EVTONLY = getattr(os, "O_EVTONLY", 0x8000)
+
+
+class Watcher:
+    def __init__(self, data: str, lock: int):
+        self.data = data
+        self.clients_dir = os.path.join(data, CLIENTS)
+        self.lock: int | None = lock
+        self.kq = select.kqueue()
+        self.roles: dict[int, str] = {}
+        self.trigger_fd: int | None = None
+        self.trigger_ino: int | None = None
+        self.clients: set[int] = set()
+        self.theme_missing_since: float | None = None
+
+    def arm(self, path: str, role: str, events: int) -> int | None:
+        try:
+            fd = os.open(path, O_EVTONLY)
+        except OSError:
+            return None
+        event = select.kevent(
+            fd,
+            filter=select.KQ_FILTER_VNODE,
+            flags=select.KQ_EV_ADD | select.KQ_EV_CLEAR,
+            fflags=events,
+        )
+        try:
+            self.kq.control([event], 0)
+        except OSError:
+            os.close(fd)
+            return None
+        self.roles[fd] = role
+        return fd
+
+    def arm_trigger(self) -> None:
+        """Watch the trigger file itself, re-opening it if it was replaced."""
+        try:
+            ino = os.stat(trigger_path()).st_ino
+        except OSError:
+            ino = None
+        if self.trigger_fd is not None and ino == self.trigger_ino:
+            return
+        self.drop_trigger()
+        if ino is not None:
+            self.trigger_fd = self.arm(trigger_path(), "trigger", FILE_EVENTS)
+            self.trigger_ino = ino if self.trigger_fd is not None else None
+
+    def drop_trigger(self) -> None:
+        if self.trigger_fd is not None:
+            self.roles.pop(self.trigger_fd, None)
+            os.close(self.trigger_fd)
+        self.trigger_fd = self.trigger_ino = None
+
+    def update(self) -> None:
+        theme = trigger_theme()
+        if theme is not None and os.path.isfile(theme_path()):
+            with contextlib.suppress(OSError):
+                sync(theme)
+
+    def rescan(self) -> None:
+        try:
+            present = {int(n) for n in os.listdir(self.clients_dir) if n.isdigit()}
+        except OSError as exc:
+            raise Stop from exc
+        self.clients &= present
+        new = sorted(present - self.clients)
+        if not new:
+            return
+        recorded = {}
+        for pid in new:
+            with contextlib.suppress(OSError), open(os.path.join(self.clients_dir, str(pid))) as f:
+                recorded[pid] = f.read().strip()
+        running = start_times(new)
+        for pid in new:
+            if recorded.get(pid) and running.get(pid) == recorded[pid]:
+                event = select.kevent(
+                    pid,
+                    filter=select.KQ_FILTER_PROC,
+                    flags=select.KQ_EV_ADD | select.KQ_EV_ONESHOT,
+                    fflags=select.KQ_NOTE_EXIT,
+                )
+                try:
+                    self.kq.control([event], 0)
+                    self.clients.add(pid)
+                    continue
+                except OSError:
+                    pass
+            self.forget(pid)
+
+    def forget(self, pid: int) -> None:
+        self.clients.discard(pid)
+        with contextlib.suppress(OSError):
+            os.unlink(os.path.join(self.clients_dir, str(pid)))
+
+    def handoff(self) -> None:
+        """No clients left: release the lock, then check once more before exiting."""
+        if self.lock is not None:
+            release(self.lock)
+            self.lock = None
+        self.rescan()
+        if not self.clients:
+            raise Stop
+        self.lock = acquire(self.data)
+        if self.lock is None:
+            raise Stop
+
+    def setup(self) -> None:
+        # Arm every watch before reading what it covers, so no change is missed.
+        for path, role in (
+            (self.data, "data"),
+            (self.clients_dir, "clients"),
+            (os.path.dirname(theme_path()), "themes"),
+            (os.path.dirname(trigger_path()), "trigger-dir"),
+        ):
+            if self.arm(path, role, DIR_EVENTS) is None:
+                raise Stop
+        self.arm_trigger()
+        if not os.path.isfile(theme_path()):
+            raise Stop
+        self.rescan()
+        self.update()
+
+    def handle(self, event) -> bool:
+        """Process one event. Returns whether the trigger may have changed."""
+        if event.filter == select.KQ_FILTER_PROC:
+            self.forget(event.ident)
+            return False
+        role = self.roles.get(event.ident)
+        gone = bool(event.fflags & GONE)
+        if role in ("data", "clients", "themes", "trigger-dir") and gone:
+            raise Stop
+        if role == "clients":
+            self.rescan()
+        elif role == "themes":
+            if os.path.isfile(theme_path()):
+                self.theme_missing_since = None
+            elif self.theme_missing_since is None:
+                self.theme_missing_since = time.monotonic()
+        elif role == "trigger":
+            if gone:
+                self.drop_trigger()
+            return True
+        elif role == "trigger-dir":
+            return True
+        return False
+
+    def run(self) -> None:
+        self.setup()
+        while True:
+            if not self.clients:
+                self.handoff()
+            timeout = None
+            if self.theme_missing_since is not None:
+                timeout = max(0.0, THEME_GRACE - (time.monotonic() - self.theme_missing_since))
+            events = self.kq.control(None, 32, timeout)
+            if self.theme_missing_since is not None:
+                if os.path.isfile(theme_path()):
+                    self.theme_missing_since = None
+                elif time.monotonic() - self.theme_missing_since >= THEME_GRACE:
+                    raise Stop
+            changed = False
+            for event in events:
+                changed = self.handle(event) or changed
+            if changed:
+                self.arm_trigger()
+                self.update()
+
+    def close(self) -> None:
+        for fd in list(self.roles):
+            os.close(fd)
+        self.roles.clear()
+        self.kq.close()
+        if self.lock is not None:
+            release(self.lock)
+            self.lock = None
 
 
 def watch(data: str) -> int:
-    fd = acquire(data)
-    if fd is None:
+    if not supported():
         return 0
-    step = tick()
-    last = mac = None
-    n = 0
+    lock = acquire(data)
+    if lock is None:
+        return 0
+    watcher = Watcher(data, lock)
     try:
-        while True:
-            if n % LIVENESS_EVERY == 0 and not wanted(data):
-                release(fd)
-                fd = None
-                if not wanted(data):
-                    return 0
-                fd = acquire(data)
-                if fd is None:
-                    return 0
-            theme = trigger_theme()
-            if theme is None:
-                if mac is None or n % DEFAULTS_EVERY == 0:
-                    mac = macos_theme()
-                theme = mac or "dark"
-            else:
-                mac = None
-            if theme != last:
-                with contextlib.suppress(OSError):
-                    sync(theme)
-                    last = theme
-            n += 1
-            time.sleep(step)
+        watcher.run()
+    except Stop:
+        pass
     finally:
-        if fd is not None:
-            release(fd)
+        watcher.close()
+    return 0
 
 
 def main(argv: list[str]) -> int:
@@ -322,11 +455,6 @@ def main(argv: list[str]) -> int:
             return 0
     if len(argv) == 3 and argv[1] == "watch":
         return watch(argv[2])
-    if len(argv) == 2 and argv[1] == "sync":
-        theme = resolve()
-        sync(theme)
-        print(theme)
-        return 0
     print(__doc__, file=sys.stderr)
     return 2
 

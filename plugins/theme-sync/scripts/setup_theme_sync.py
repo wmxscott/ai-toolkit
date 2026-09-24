@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Point Claude Code's theme setting at the theme-sync theme.
 
-Writes the theme file, then sets "theme": "custom:theme-sync" in settings.json,
-keeping every other key, and starts the watcher. A symlinked settings.json is
-written through to its target.
+Needs macOS and theme-monitor. Writes the theme file, then sets
+"theme": "custom:theme-sync" in settings.json, keeping every other key, and
+starts the watcher. A symlinked settings.json is written through to its target.
 
 Exit status: 0 done or already set, 1 error, 3 a different theme is set and
---force was not given.
+--force was not given, 4 theme-monitor isn't running.
 """
 
 from __future__ import annotations
@@ -20,6 +20,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import theme_sync
 
 EXIT_CONFLICT = 3
+EXIT_NO_THEME_MONITOR = 4
+INSTALL_THEME_MONITOR = (
+    "brew install wmxscott/tap/theme-monitor && brew services start theme-monitor"
+)
 
 
 class SetupError(Exception):
@@ -52,6 +56,15 @@ def load(path: str) -> dict:
 def setup(data_dir: str, settings: str, force: bool) -> int:
     if not os.path.isabs(data_dir):
         raise SetupError(f"data dir must be an absolute path, got {data_dir!r}")
+    if not theme_sync.supported():
+        raise SetupError("theme-sync works on macOS only")
+    trigger = theme_sync.trigger_theme()
+    if trigger is None:
+        print(f"theme-sync needs theme-monitor, and {theme_sync.trigger_path()} isn't there.")
+        print("Install and start it, then run setup again:")
+        print(f"  {INSTALL_THEME_MONITOR}")
+        print("Nothing changed.")
+        return EXIT_NO_THEME_MONITOR
     target = os.path.realpath(settings)
     via = f" (through the symlink {settings})" if os.path.islink(settings) else ""
     data = load(target)
@@ -66,7 +79,7 @@ def setup(data_dir: str, settings: str, force: bool) -> int:
 
     themes_dir = os.path.dirname(theme_sync.theme_path())
     new_dir = not os.path.isdir(themes_dir)
-    theme = theme_sync.resolve()
+    theme = theme_sync.override_theme() or trigger
     theme_sync.sync(theme)
     print(f"Theme file {theme_sync.theme_path()} follows the appearance, now {theme}.")
 

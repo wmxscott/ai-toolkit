@@ -14,13 +14,6 @@ PLUGIN = Path(__file__).resolve().parent.parent
 SCRIPTS = PLUGIN / "scripts"
 HOOK = SCRIPTS / "session_start.sh"
 
-DEFAULTS_STUB = """#!/bin/sh
-# Stands in for `defaults read -g AppleInterfaceStyle`: prints Dark when
-# $HOME/appearance says so, and fails like the real key does in light mode.
-[ "$(cat "$HOME/appearance" 2>/dev/null)" = Dark ] || exit 1
-echo Dark
-"""
-
 FAKE_CLAUDE = """
 import subprocess, sys
 subprocess.run(["sh", "-c", 'bash "$0"', sys.argv[1]], stdin=subprocess.DEVNULL)
@@ -29,20 +22,7 @@ sys.stdin.read()
 """
 
 
-def make_stubs(tmp_path: Path) -> Path:
-    stubs = tmp_path / "bin"
-    stubs.mkdir(exist_ok=True)
-    (stubs / "defaults").write_text(DEFAULTS_STUB)
-    (stubs / "defaults").chmod(0o755)
-    return stubs
-
-
-@pytest.fixture
-def stubs(tmp_path):
-    return make_stubs(tmp_path)
-
-
-def wait_for(predicate, timeout=10.0, interval=0.02):
+def wait_for(predicate, timeout=10.0, interval=0.002):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         value = predicate()
@@ -66,7 +46,9 @@ def ts(monkeypatch):
 
 
 class Sandbox:
-    """A scratch $HOME, a stubbed `defaults`, and every process started from it."""
+    """A scratch $HOME, and every process started from it."""
+
+    wait_for = staticmethod(wait_for)
 
     def __init__(self, tmp_path: Path):
         self.root = tmp_path
@@ -77,26 +59,25 @@ class Sandbox:
         self.settings = self.claude / "settings.json"
         self.data = self.claude / "plugins" / "data" / "theme-sync-ai-toolkit"
         self.trigger = self.home / ".local" / "share" / "theme-monitor" / "theme-change.trigger"
-        stubs = make_stubs(tmp_path)
         self.env = {
             "HOME": str(self.home),
-            "PATH": f"{stubs}:/usr/bin:/bin",
+            "PATH": "/usr/bin:/bin",
             "CLAUDE_PLUGIN_ROOT": str(PLUGIN),
             "CLAUDE_PLUGIN_DATA": str(self.data),
-            "CLAUDE_THEME_SYNC_TICK": "0.05",
         }
         self.procs: list[subprocess.Popen] = []
 
-    wait_for = staticmethod(wait_for)
-
-    def set_appearance(self, dark: bool):
-        (self.home / "appearance").write_text("Dark" if dark else "")
-
     def set_trigger(self, value: str):
+        """Write the trigger file in place, keeping its inode, as theme-monitor does."""
         self.trigger.parent.mkdir(parents=True, exist_ok=True)
         with open(self.trigger, "r+" if self.trigger.exists() else "w") as f:
             f.truncate(0)
             f.write(value)
+
+    def replace_trigger(self, value: str):
+        tmp = self.trigger.with_name("new.tmp")
+        tmp.write_text(value)
+        os.replace(tmp, self.trigger)
 
     def enable(self, content=None):
         self.theme.parent.mkdir(parents=True, exist_ok=True)
@@ -148,6 +129,11 @@ class Sandbox:
             if marker in args:
                 pids.append(int(pid))
         return pids
+
+    def one_watcher(self):
+        found = self.wait_for(lambda: len(self.watchers()) == 1 and self.watchers())
+        assert found, self.watchers()
+        return found[0]
 
     def clients(self):
         folder = self.data / "clients"
