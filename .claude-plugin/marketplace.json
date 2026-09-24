@@ -5,5 +5,12 @@
   "owner": {
     "name": "wmxscott"
   },
-  "plugins": []
+  "plugins": [
+    {
+      "name": "terminal-title",
+      "source": "./plugins/terminal-title",
+      "description": "Titles the terminal tab after the current task, in Herdr, tmux or any xterm-compatible terminal",
+      "category": "productivity"
+    }
+  ]
 }

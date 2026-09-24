@@ -1,0 +1,32 @@
+{
+  "description": "Keep the terminal title in step with the session: restore it on resume, set a placeholder and load the skill on a new session",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/restore_title.sh\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/prime_title.sh\"",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/session_start_context.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
