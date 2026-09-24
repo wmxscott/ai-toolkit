@@ -28,8 +28,8 @@ jobs:
           node-version: lts/*
       - name: JSON syntax
         run: git ls-files -z '*.json' | xargs -0 -n1 jq empty
-      - name: Install Claude Code
-        run: npm install --global @anthropic-ai/claude-code
+      - name: Install Claude Code and Codex
+        run: npm install --global @anthropic-ai/claude-code @openai/codex
       - name: Validate marketplace and plugins
         run: scripts/validate.sh
 
