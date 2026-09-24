@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "ai-toolkit",
+  "description": "Plugins for AI coding agents",
+  "owner": {
+    "name": "wmxscott"
+  },
+  "plugins": [
+    {
+      "name": "terminal-title",
+      "source": "./plugins/terminal-title",
+      "description": "Titles the terminal tab after the current task, in Herdr, tmux or any xterm-compatible terminal",
+      "category": "productivity"
+    }
+  ]
+}

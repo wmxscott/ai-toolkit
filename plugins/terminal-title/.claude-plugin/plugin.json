@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "terminal-title",
+  "description": "Titles the terminal tab after the current task, in Herdr, tmux or any xterm-compatible terminal",
+  "author": {
+    "name": "wmxscott"
+  },
+  "homepage": "https://github.com/wmxscott/ai-toolkit/tree/main/plugins/terminal-title",
+  "repository": "https://github.com/wmxscott/ai-toolkit",
+  "license": "MIT",
+  "keywords": ["terminal", "title", "tmux", "herdr", "session"]
+}
