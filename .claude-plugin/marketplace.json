@@ -23,6 +23,12 @@
       "source": "./plugins/statusline",
       "description": "Three-line NerdFont statusline: git, model, effort, context, cost and rate limits, in Catppuccin colours that follow the system theme",
       "category": "productivity"
+    },
+    {
+      "name": "stacked-planning",
+      "source": "./plugins/stacked-planning",
+      "description": "Plans and lands work that spans several pull requests as ordered stacks, with a PR size gate and a stack overlap check",
+      "category": "development"
     }
   ]
 }

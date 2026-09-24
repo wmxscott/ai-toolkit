@@ -1,0 +1,24 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "stacked-planning",
+  "description": "Plans and lands work that spans several pull requests as ordered stacks, with a PR size gate and a stack overlap check",
+  "author": {
+    "name": "wmxscott"
+  },
+  "homepage": "https://github.com/wmxscott/ai-toolkit/tree/main/plugins/stacked-planning",
+  "repository": "https://github.com/wmxscott/ai-toolkit",
+  "license": "MIT",
+  "keywords": ["planning", "stacked-prs", "pull-requests", "code-review", "worktrees"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Stacked Planning",
+        "shortDescription": "Plan and land multi-PR work as ordered stacks",
+        "developerName": "wmxscott",
+        "category": "Developer Tools",
+        "capabilities": ["Read", "Write"],
+        "websiteURL": "https://github.com/wmxscott/ai-toolkit/tree/main/plugins/stacked-planning"
+      }
+    }
+  }
+}
