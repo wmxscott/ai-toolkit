@@ -10,6 +10,12 @@
   "type": "module",
   "main": ".opencode/plugins/ai-toolkit.js",
   "pi": {
+    "extensions": [
+      "./pi/extensions/display.ts",
+      "./pi/extensions/statusline.ts",
+      "./pi/extensions/theme-switcher.ts"
+    ],
+    "themes": ["./pi/themes/catppuccin-latte.json", "./pi/themes/catppuccin-macchiato.json"],
     "skills": ["./plugins/stacked-planning/skills"]
   }
 }

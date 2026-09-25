@@ -44,7 +44,7 @@ OpenCode: add the repository to `opencode.json` and restart OpenCode. The key is
 }
 ```
 
-The Pi package and the OpenCode plugin bring in every ai-toolkit plugin that supports that agent, which are those ticked in the [main README](../../README.md#plugins).
+The Pi package and the OpenCode plugin bring in every ai-toolkit plugin that supports that agent, which are those ticked in the [main README](../../README.md#plugins). The Pi package also brings in the [Pi extensions](../../README.md#pi-extensions); the main README shows how to filter them out.
 
 ## Requirements
 

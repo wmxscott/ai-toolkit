@@ -4,7 +4,7 @@
 
 Small plugins for AI coding agents. Each plugin does one thing and installs on its own.
 
-The repository is a Claude Code plugin marketplace, a Codex one, and a Pi and OpenCode package, each for the plugins marked below. Support for Codex, Pi and OpenCode is added per plugin where the feature makes sense there.
+The repository is a Claude Code plugin marketplace, a Codex one, and a Pi and OpenCode package, each for the plugins marked below. Support for Codex, Pi and OpenCode is added per plugin where the feature makes sense there. The Pi package also carries a few [Pi extensions](#pi-extensions) of its own.
 
 ## Plugins
 
@@ -51,13 +51,13 @@ To update, run `codex plugin marketplace upgrade ai-toolkit`, then `codex plugin
 
 ### Pi
 
-The repository is a [Pi package](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md) that exposes the skills of every plugin with a Pi tick, and nothing else:
+The repository is a [Pi package](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md) that exposes the skills of every plugin with a Pi tick, plus the [Pi extensions](#pi-extensions) and their themes:
 
 ```sh
 pi install git:github.com/wmxscott/ai-toolkit
 ```
 
-`pi update` picks up new versions. To load only some plugins, filter the package's `skills` in `~/.pi/agent/settings.json`.
+`pi update --extensions` picks up new versions. To load only part of the package, see [Choosing what loads](#choosing-what-loads).
 
 ### OpenCode
 
@@ -79,6 +79,39 @@ OpenCode 2 (`opencode2`, 2.0.4 or later) names the key `plugins`:
 
 OpenCode caches the install. If a restart doesn't pick up a new version, clear its package cache (`~/.cache/opencode`).
 
+## Pi extensions
+
+[Pi](https://github.com/earendil-works/pi) extensions and themes, installed by the same Pi package as the skills above. [pi/README.md](pi/README.md) has the details.
+
+| Extension | What it does |
+|---|---|
+| [statusline](pi/README.md#statuslinets) | Three-line NerdFont footer: git, model, effort, context, tokens and cost, in Catppuccin colours that follow the system theme |
+| [theme-switcher](pi/README.md#theme-switcherts) | Switches Pi between Catppuccin Latte and Macchiato the moment the macOS appearance changes, through [theme-monitor](https://github.com/wmxscott/theme-monitor) |
+| [display](pi/README.md#displayts) | Draws code blocks in replies inside a frame labelled with their language. Adapted from [pix-display](https://github.com/xynogen/pix-mono/tree/main/packages/pix-display) by xynogen (MIT) |
+
+The themes are `catppuccin-latte` and `catppuccin-macchiato`.
+
+```sh
+pi install git:github.com/wmxscott/ai-toolkit
+```
+
+### Choosing what loads
+
+`pi install` loads everything in the package. To narrow it, replace the package's entry in `~/.pi/agent/settings.json` with the object form, which filters each resource type. Only the extensions and themes, no skills:
+
+```json
+{
+  "packages": [
+    {
+      "source": "git:github.com/wmxscott/ai-toolkit",
+      "skills": []
+    }
+  ]
+}
+```
+
+Only the skills: `"extensions": [], "themes": []`. A list keeps the matching files, with paths relative to the repository root and `!` to exclude, so `"extensions": ["!pi/extensions/display.ts"]` loads every extension except display. `pi config` toggles the same resources interactively. See Pi's [package filtering](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md#select-package-resources).
+
 ## Layout
 
 ```
@@ -87,10 +120,11 @@ OpenCode caches the install. If a restart doesn't pick up a new version, clear i
 plugins/<name>/                   one plugin, self-contained
   .claude-plugin/plugin.json      its Claude Code manifest
   plugin.json                     its Codex manifest, if it supports Codex
-package.json                      the Pi package: lists each Pi and OpenCode plugin's skills
-.opencode/plugins/ai-toolkit.js   the OpenCode plugin: registers those same skills
   README.md                       what it does and how to use it
   tests/                          its tests
+package.json                      the Pi package: each Pi and OpenCode plugin's skills, and pi/
+.opencode/plugins/ai-toolkit.js   the OpenCode plugin: registers those same skills
+pi/                               Pi extensions and themes
 tests/                            checks across the whole repository
 scripts/validate.sh               validates the marketplace and every plugin
 ```
