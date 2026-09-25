@@ -18,7 +18,7 @@ The repository is a Claude Code plugin marketplace, a Codex one, and a Pi and Op
 | [security-key-git-signing](plugins/security-key-git-signing) | Checks a hardware security key is plugged in before git signs a commit or tag with GPG, and asks for it if not | ✓ | ✓ | | |
 | [stacked-planning](plugins/stacked-planning) | Plans and lands work that spans several pull requests as ordered stacks, with a PR size gate and a stack overlap check | ✓ | ✓ | ✓ | ✓ |
 | [theme-sync](plugins/theme-sync) | Switches Claude Code between its light and dark themes the moment the macOS appearance changes | ✓ | | | |
-| [pr-tracker](plugins/pr-tracker) | Tracks the pull requests a session opens and tells it when their checks or reviews change, through the [pr-tracker](https://github.com/wmxscott/pr-tracker) CLI | ✓ | ✓ | | |
+| [pr-tracker](plugins/pr-tracker) | Tracks the pull requests a session opens and tells it when their checks or reviews change, through the [pr-tracker](https://github.com/wmxscott/pr-tracker) CLI | ✓ | ✓ | ✓ | |
 | [herdr](plugins/herdr) | Starts each piece of work in its own git worktree, opened as its own [Herdr](https://herdr.dev) workspace, with [herdr-wkt](https://github.com/wmxscott/herdr-wkt) | ✓ | ✓ | | |
 
 ## Install
@@ -61,7 +61,7 @@ pi install git:github.com/wmxscott/ai-toolkit
 
 ### OpenCode
 
-The repository is also an [OpenCode plugin](https://opencode.ai/docs/plugins/) that registers the same skills. Add it to `opencode.json`, then restart OpenCode. OpenCode 1:
+The repository is also an [OpenCode plugin](https://opencode.ai/docs/plugins/) that registers the skills of every plugin with an OpenCode tick. Add it to `opencode.json`, then restart OpenCode. OpenCode 1:
 
 ```json
 {
@@ -87,6 +87,7 @@ OpenCode caches the install. If a restart doesn't pick up a new version, clear i
 |---|---|
 | [statusline](pi/README.md#statuslinets) | Three-line NerdFont footer: git, model, effort, context, tokens and cost, in Catppuccin colours that follow the system theme |
 | [theme-switcher](pi/README.md#theme-switcherts) | Switches Pi between Catppuccin Latte and Macchiato the moment the macOS appearance changes, through [theme-monitor](https://github.com/wmxscott/theme-monitor) |
+| [pr-tracker](pi/README.md#pr-trackerts) | Runs the [pr-tracker plugin](plugins/pr-tracker)'s hooks in Pi: records the PRs a session opens and hands their check and review changes back to it |
 | [display](pi/README.md#displayts) | Draws code blocks in replies inside a frame labelled with their language. Adapted from [pix-display](https://github.com/xynogen/pix-mono/tree/main/packages/pix-display) by xynogen (MIT) |
 
 The themes are `catppuccin-latte` and `catppuccin-macchiato`.
@@ -109,6 +110,21 @@ pi install git:github.com/wmxscott/ai-toolkit
   ]
 }
 ```
+
+Every extension and theme, and of the skills only pr-tracker's:
+
+```json
+{
+  "packages": [
+    {
+      "source": "git:github.com/wmxscott/ai-toolkit",
+      "skills": ["plugins/pr-tracker/skills/*"]
+    }
+  ]
+}
+```
+
+Skill patterns match each skill's directory: write them without a leading `./`, and keep the `/*`, since `plugins/pr-tracker/skills` alone matches nothing.
 
 Only the skills: `"extensions": [], "themes": []`. A list keeps the matching files, with paths relative to the repository root and `!` to exclude, so `"extensions": ["!pi/extensions/display.ts"]` loads every extension except display. `pi config` toggles the same resources interactively. See Pi's [package filtering](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md#select-package-resources).
 

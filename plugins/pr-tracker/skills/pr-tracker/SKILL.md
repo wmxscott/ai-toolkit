@@ -6,7 +6,7 @@ allowed-tools: Bash(pr-tracker list *) Bash(pr-tracker status)
 
 # pr-tracker
 
-The plugin's hooks record every PR this session opens with `gh pr create`, `gh stack submit`, `gh stack push` or a GitHub MCP `create_pull_request` tool. A background service refreshes their checks and reviews, and any change arrives in your context on your next tool call. None of that needs you.
+The plugin's hooks (in Pi, its extension) record every PR this session opens with `gh pr create`, `gh stack submit`, `gh stack push` or a GitHub MCP `create_pull_request` tool. A background service refreshes their checks and reviews, and any change arrives in your context after your next shell command. None of that needs you.
 
 This skill covers what the hooks can't see, and reading the current state.
 
