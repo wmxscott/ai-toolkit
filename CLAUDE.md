@@ -11,7 +11,7 @@ A public plugin marketplace for AI coding agents, named `ai-toolkit`. Claude Cod
 ```
 .claude-plugin/marketplace.json   Claude Code marketplace, one entry per plugin
 .agents/plugins/marketplace.json  Codex marketplace, one entry per Codex plugin
-package.json                      Pi package: `pi.skills` lists each Pi/OpenCode plugin's skills
+package.json                      Pi package: `pi.skills` lists each Pi/OpenCode plugin's skills; `pi.extensions`, `pi.themes` the files in pi/
 .opencode/plugins/ai-toolkit.js   OpenCode plugin: adds those same skill directories
 plugins/<name>/
   .claude-plugin/plugin.json      Claude Code plugin manifest
@@ -22,6 +22,8 @@ plugins/<name>/
   scripts/                        scripts used by hooks and skills
   README.md                       user-facing docs
   tests/                          pytest tests for this plugin
+pi/extensions/, pi/themes/        Pi extensions and themes, not tied to any plugin (see "Pi extensions")
+pi/README.md                      their user-facing docs
 tests/                            repository-wide checks (marketplace, Codex, Pi and OpenCode)
 scripts/validate.sh               validates the marketplace and every plugin
 pyproject.toml                    dev tooling only (pytest, ruff, shellcheck), managed with uv
@@ -54,9 +56,9 @@ Leave `version` out of both manifests (the tests require them to agree). Codex t
 
 ## Pi and OpenCode support
 
-Pi and OpenCode have no marketplace; both load plain [Agent Skills](https://agentskills.io/specification) and nothing else from this repository. So a plugin supports both or neither, and only when its skills work without Claude-only parts. Such a plugin must support Codex too.
+Pi and OpenCode have no marketplace; from the plugins, both load plain [Agent Skills](https://agentskills.io/specification) and nothing else. So a plugin supports both or neither, and only when its skills work without Claude-only parts. Such a plugin must support Codex too.
 
-1. Add `./plugins/<name>/skills` to `pi.skills` in the root `package.json`. That list is what `pi install git:github.com/wmxscott/ai-toolkit` loads, and `.opencode/plugins/ai-toolkit.js` (the package's `main`, loaded through `"plugin": ["ai-toolkit@git+https://github.com/wmxscott/ai-toolkit.git"]`) reads the same list. The module's default export carries both OpenCode plugin shapes: `server`, whose config hook adds the directories to `skills.paths` (OpenCode 1, config key `plugin`), and `setup`, which adds each skill through `ctx.skill.transform` (OpenCode 2, config key `plugins`). OpenCode 1 calls `setup` as well, so it returns early without a skill domain. OpenCode 2 resolves a git or npm install through the package `main`, so keep it pointing at the module. Keep the package `private`, with no dependencies, and add no root `skills/`, `extensions/`, `prompts/` or `themes/`: Pi would load them from every install.
+1. Add `./plugins/<name>/skills` to `pi.skills` in the root `package.json`. That list is the skills `pi install git:github.com/wmxscott/ai-toolkit` loads, and `.opencode/plugins/ai-toolkit.js` (the package's `main`, loaded through `"plugin": ["ai-toolkit@git+https://github.com/wmxscott/ai-toolkit.git"]`) reads the same list. The module's default export carries both OpenCode plugin shapes: `server`, whose config hook adds the directories to `skills.paths` (OpenCode 1, config key `plugin`), and `setup`, which adds each skill through `ctx.skill.transform` (OpenCode 2, config key `plugins`). OpenCode 1 calls `setup` as well, so it returns early without a skill domain. OpenCode 2 resolves a git or npm install through the package `main`, so keep it pointing at the module. Keep the package `private`, with no dependencies, and add no root `skills/`, `extensions/`, `prompts/` or `themes/`: Pi would load them from every install.
 2. Tick the Pi and OpenCode columns in the `README.md` table, and give the plugin's README an install section per agent.
 3. Make the skills portable:
    - Frontmatter is `name` (the directory name) and `description` (at most 1024 characters, strict YAML: no `: ` in a plain scalar, or a strict parser drops the skill).
@@ -65,6 +67,18 @@ Pi and OpenCode have no marketplace; both load plain [Agent Skills](https://agen
    - Run scripts through their interpreter (`uv run --script x.py`, `python3 x.py`) rather than relying on the executable bit.
 
 `tests/test_agents.py` checks the package, the OpenCode module under fake OpenCode 1 and 2 contexts (with node), that Claude, Codex and Pi load the same skills, and the README columns.
+
+## Pi extensions
+
+`pi/` holds Pi [extensions](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md) and [themes](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/themes.md). They aren't plugins: no other agent can load them, and `plugins/` is one Claude Code plugin per directory. The same Pi package installs them with the skills, and users drop either side with a package filter in their Pi settings (`"skills": []`, or `"extensions": [], "themes": []`), documented in the README.
+
+1. Put the file in `pi/extensions/<name>.ts` (a single file) or `pi/themes/<name>.json` (`name` inside must match), and list its path in `pi.extensions` or `pi.themes` in `package.json`. Pi loads only what those lists name.
+2. Import only `node:*` builtins and the packages Pi supplies (`@earendil-works/pi-coding-agent`, `pi-ai`, `pi-agent-core`, `pi-tui`, `typebox`). The package has no dependencies, and adding any would also install them for OpenCode.
+3. Follow Pi's lifecycle: start watchers and timers in `session_start`, stop them in `session_shutdown`, and guard terminal-only code with `ctx.mode === "tui"`. Silence child-process stderr, or it scribbles over the TUI.
+4. Keep third-party code's copyright and licence notice at the top of the file, and credit it in `pi/README.md`.
+5. Add a row to the extension table in `README.md` and a section to `pi/README.md`.
+
+`tests/test_pi.py` checks the lists match `pi/`, the themes against Pi's schema (`tests/schemas/pi-0.87.1-theme.schema.json`), imports, attribution and the READMEs. It parses each extension with node's own TypeScript stripper when node is 22.13 or later. When `pi` is on `PATH`, it also loads the package with Pi in a throwaway home, with and without the skills filter. For a full type-check, install `@earendil-works/pi-coding-agent` (the version of your Pi), `typescript` and `@types/node` in a scratch directory outside the repository. Give it a `tsconfig.json` with `strict`, `noEmit`, `moduleResolution: "Bundler"`, `paths: {"*": ["./node_modules/*"]}` and `include` pointing at `pi/extensions/*.ts`, then run `tsc -p`.
 
 ## Checks
 

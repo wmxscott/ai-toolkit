@@ -59,9 +59,10 @@ def test_package_is_private_and_carries_nothing_to_install():
 
 
 def test_pi_sees_only_the_listed_skills():
-    """With no manifest entry for them, Pi would fall back to these conventional directories
-    and could pick up a Claude-only plugin's resources."""
-    assert set(PACKAGE["pi"]) == {"skills"}
+    """Pi's docs describe falling back to these conventional directories when the manifest
+    has no entry (0.87.1 doesn't), which could pick up a Claude-only plugin's resources.
+    Extensions and themes are Pi's own, under `pi/`: see tests/test_pi.py."""
+    assert set(PACKAGE["pi"]) == {"skills", "extensions", "themes"}
     names = pi_plugins()
     assert len(names) == len(set(names))
     for directory in ("skills", "extensions", "prompts", "themes"):
