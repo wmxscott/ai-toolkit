@@ -1,6 +1,6 @@
 # pr-tracker
 
-Connects your coding agent to [pr-tracker](https://github.com/wmxscott/pr-tracker), which records the pull requests each session opens, keeps their checks and reviews fresh in the background, and tells the session when they change. When CI goes red on a PR the agent opened ten minutes ago, the agent hears about it on its next tool call or prompt, and an idle Claude Code session is woken to deal with it.
+Connects your coding agent to [pr-tracker](https://github.com/wmxscott/pr-tracker), which records the pull requests each session opens, keeps their checks and reviews fresh in the background, and tells the session when they change. When CI goes red on a PR the agent opened ten minutes ago, the agent hears about it on its next tool call or prompt, and an idle Claude Code or Pi session is woken to deal with it.
 
 The plugin is a thin layer: hooks that call the CLI (in Pi, an extension), a skill, and a `prs` command. The CLI does the work.
 
@@ -33,7 +33,7 @@ Codex runs a plugin's hooks only once you trust them. Start Codex, choose to rev
 
 ### Pi
 
-The [ai-toolkit Pi package](../../README.md#pi) brings the skills and the [`pr-tracker.ts` extension](../../pi/README.md#pr-trackerts), which does in Pi what the hooks below do elsewhere:
+The [ai-toolkit Pi package](../../README.md#pi) brings the skills and the [`pr-tracker.ts` extension](../../pi/README.md#pr-trackerts), which does in Pi what the hooks below do elsewhere, waking an idle session included:
 
 ```sh
 pi install git:github.com/wmxscott/ai-toolkit
@@ -62,7 +62,7 @@ OpenCode isn't supported, so the ai-toolkit OpenCode plugin leaves these skills 
 | `PostToolUseFailure`, every tool | `pr-tracker hook` | The same, for a tool call that failed |
 | `UserPromptSubmit` | `pr-tracker hook prompt` | Delivers queued changes along with your prompt |
 | `Stop` | `pr-tracker hook stop` | When failing checks or a review decision are queued, hands them to Claude so it keeps going, once per turn. Otherwise shows you the queued changes, leaving them queued |
-| `Stop`, `asyncRewake` | `pr-tracker hook wait --for 3540` | Claude Code only. Waits in the background after a turn for failing checks or a review decision, then wakes the idle session with them |
+| `Stop`, `asyncRewake` | `pr-tracker hook wait --for 3540` | Claude Code only (Pi's extension polls instead). Waits in the background after a turn for failing checks or a review decision, then wakes the idle session with them |
 
 Claude Code and Codex load the same `hooks/hooks.json`. Codex sends the same payload, with `Bash` as the shell tool's name, and the CLI records its sessions as `codex`. The CLI also recognises Codex's GitHub connector, `mcp__codex_apps__github__create_pull_request`. `wait` returns at once in Codex, which has no `asyncRewake`, and Codex sessions only see `stop`'s message, not a continued turn. Codex shows the `Stop` message in its TUI only, not in `codex exec`. A Codex subagent's hooks carry the parent's session id, so a PR it opens belongs to the parent session, and its events reach the parent, never the subagent. Recording is offline and takes a few milliseconds. The CLI's README documents the [hook contract](https://github.com/wmxscott/pr-tracker#the-hook-contract).
 
