@@ -18,35 +18,29 @@ def frontmatter(skill):
 
 
 def test_hooks_call_the_cli_modes():
-    assert set(HOOKS) == {"PostToolUse", "Stop"}
-    found = {}
+    """Every tool call is a chance to deliver, so no hook has a matcher: the CLI picks the
+    mode from the payload, including which MCP tools create PRs."""
+    found = []
     for event, groups in HOOKS.items():
-        for group in groups:
-            [hook] = group["hooks"]
+        [group] = groups
+        assert "matcher" not in group
+        for hook in group["hooks"]:
             assert hook["type"] == "command"
-            assert hook["timeout"] == 10
-            match = re.fullmatch(WRAPPER + r"([a-z-]+)", hook["command"])
+            match = re.fullmatch(WRAPPER + r"?([a-z]+)?(?: --for (\d+))?", hook["command"])
             assert match, hook["command"]
-            found[match[1]] = (event, group.get("matcher"))
-    assert found == {
-        "post-bash": ("PostToolUse", "Bash"),
-        "post-mcp": ("PostToolUse", "mcp__.*github.*__create_pull_request"),
-        "stop": ("Stop", None),
-    }
+            found.append((event, match[1], hook["timeout"], hook.get("asyncRewake", False)))
+    assert found == [
+        ("PostToolUse", None, 10, False),
+        ("PostToolUseFailure", None, 10, False),
+        ("UserPromptSubmit", "prompt", 10, False),
+        ("Stop", "stop", 10, False),
+        ("Stop", "wait", 3600, True),
+    ]
 
 
-@pytest.mark.parametrize(
-    "tool",
-    [
-        "mcp__github__create_pull_request",
-        "mcp__plugin_github_github__create_pull_request",
-        "mcp__my-github-server__create_pull_request",
-        "mcp__codex_apps__github__create_pull_request",
-    ],
-)
-def test_mcp_matcher_catches_github_servers(tool):
-    [group] = [g for g in HOOKS["PostToolUse"] if g["matcher"] != "Bash"]
-    assert re.fullmatch(group["matcher"], tool)
+def test_wait_gives_up_before_its_timeout():
+    [wait] = [hook for hook in HOOKS["Stop"][0]["hooks"] if hook.get("asyncRewake")]
+    assert int(wait["command"].rsplit(" ", 1)[1]) < wait["timeout"]
 
 
 def test_tracker_skill_frontmatter():
