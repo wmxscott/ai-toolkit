@@ -70,6 +70,19 @@ Pi's own Markdown renderer still does the syntax highlighting. The frame uses th
 
 Adapted from the code-block renderer of [pix-display](https://github.com/xynogen/pix-mono/tree/main/packages/pix-display) by xynogen, under the MIT License. The copyright and licence notice is at the top of `display.ts`.
 
+## `pr-tracker.ts`
+
+Pi's half of the [pr-tracker plugin](../plugins/pr-tracker): it does in Pi what the plugin's hooks do in Claude Code and Codex, through the [pr-tracker](https://github.com/wmxscott/pr-tracker) CLI.
+
+| Pi event | Runs | Does |
+|---|---|---|
+| `tool_result` of `bash` | `pr-tracker hook post-bash --agent pi` | Records a PR the command created, then appends queued check and review changes to the command's output, where the model reads them |
+| `agent_settled` | `pr-tracker hook stop --agent pi` | Shows you changes that haven't reached the agent yet as a notification, leaving them queued |
+
+It needs pr-tracker 1.1.0 or later; the [plugin's README](../plugins/pr-tracker/README.md) covers installing it. It looks for `pr-tracker` on `PATH`, then in `/opt/homebrew/bin`, `/usr/local/bin`, `/home/linuxbrew/.linuxbrew/bin` and `~/.local/bin`, once per session. Without it, the extension does nothing. It never fails a tool call: a missing, slow (10 seconds) or broken CLI leaves the result as it was.
+
+Pi has no MCP support of its own, so only PRs created from `bash` are recorded. `pr-tracker adopt` attaches any other.
+
 ## Themes
 
 `themes/catppuccin-latte.json` and `themes/catppuccin-macchiato.json` are [Catppuccin](https://catppuccin.com) Latte and Macchiato for Pi. Pick them in `/settings`, or let theme-switcher do it.

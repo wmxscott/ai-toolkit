@@ -26,6 +26,16 @@ def pi_plugins():
     return names
 
 
+def opencode_plugins():
+    """The Pi plugins less the module's PI_ONLY list."""
+    source = (ROOT / OPENCODE_MODULE).read_text()
+    pi_only = re.search(r"^const PI_ONLY = \[(.*?)\];$", source, re.M | re.S)
+    assert pi_only
+    skipped = {PI_SKILLS.fullmatch(entry)[1] for entry in re.findall(r'"([^"]+)"', pi_only[1])}
+    assert skipped <= set(pi_plugins())
+    return [name for name in pi_plugins() if name not in skipped]
+
+
 def skills_in(*directories):
     return sorted(
         skill.name
@@ -89,7 +99,8 @@ def test_every_agent_loads_the_same_skills(name):
 @pytest.mark.parametrize("plugin", sorted(p.name for p in PLUGINS.iterdir() if p.is_dir()))
 @pytest.mark.parametrize("column", ["Pi", "OpenCode"])
 def test_readme_columns_match_package(plugin, column):
-    assert (readme_column(plugin, column) == "✓") == (plugin in pi_plugins())
+    supported = pi_plugins() if column == "Pi" else opencode_plugins()
+    assert (readme_column(plugin, column) == "✓") == (plugin in supported)
 
 
 def test_opencode_module_is_the_package_entry_point():
@@ -131,7 +142,7 @@ def run_setup():
 
 
 def portable_skills():
-    for name in pi_plugins():
+    for name in opencode_plugins():
         for skill in skills_in(PLUGINS / name / "skills"):
             yield PLUGINS / name / "skills" / skill / "SKILL.md"
 
@@ -149,7 +160,7 @@ needs_node = pytest.mark.skipif(not shutil.which("node"), reason="needs node")
 
 @needs_node
 def test_opencode_1_adds_each_skills_directory_once():
-    expected = [str(ROOT / "plugins" / name / "skills") for name in pi_plugins()]
+    expected = [str(ROOT / "plugins" / name / "skills") for name in opencode_plugins()]
     assert run_config_hook({}) == {"skills": {"paths": expected}}
     kept = run_config_hook({"skills": {"paths": ["/elsewhere"]}})
     assert kept["skills"]["paths"] == ["/elsewhere", *expected]

@@ -6,10 +6,13 @@ https://github.com/earendil-works/pi/blob/v0.87.1/packages/coding-agent/src/mode
 
 import json
 import os
+import queue
 import re
 import shutil
 import subprocess
 import tempfile
+import threading
+import time
 from pathlib import Path
 
 import jsonschema
@@ -94,7 +97,7 @@ def test_extension_imports_only_what_pi_supplies(path):
 )
 def test_no_personal_paths(path):
     text = path.read_text()
-    assert not re.search(r"/(?:Users|home)/[^/\s\"']+", text)
+    assert not re.search(r"/(?:Users|home)/(?!linuxbrew/)[^/\s\"']+", text)
     assert "dotfiles" not in text.lower()
 
 
@@ -238,3 +241,287 @@ def test_pi_loads_the_whole_package(tmp_path):
 def test_pi_filter_drops_the_skills(tmp_path):
     commands = run_pi(tmp_path, {"source": str(ROOT), "skills": []})
     assert set(commands) == {"statusline"}
+
+
+# pr-tracker.ts: Pi's side of plugins/pr-tracker. Its tests stub the CLI and build every
+# environment from scratch, so neither a real pr-tracker nor its ledger is ever reached.
+PR_TRACKER = PI_DIR / "extensions" / "pr-tracker.ts"
+PR_TRACKER_STUB = """#!/bin/bash
+n=$(ls "$STUB_OUT" | grep -c '[.]json$')
+printf '%s\\n' "$@" > "$STUB_OUT/$n.args"
+cat > "$STUB_OUT/$n.json"
+printf 'stub noise\\n' >&2
+event='"PR #7: checks failing"'
+case "$STUB_MODE:$2" in
+  ok:post-bash) printf '{"hookSpecificOutput":{"additionalContext":%s}}\\n' "$event" ;;
+  ok:stop) printf '{"systemMessage":%s}\\n' "$event" ;;
+  broken:*) printf 'Traceback\\n'; exit 1 ;;
+esac
+"""
+
+
+def test_package_carries_pr_trackers_extension_and_skills():
+    assert "./pi/extensions/pr-tracker.ts" in EXTENSIONS
+    assert "./plugins/pr-tracker/skills" in PACKAGE["pi"]["skills"]
+    assert '"skills": ["plugins/pr-tracker/skills/*"]' in README
+    assert "`pr-tracker.ts`" in PI_README
+
+
+def tool_dir(name):
+    """The real directory of a tool, so a PATH entry for it can't bring along a real
+    pr-tracker installed next to a symlink, as in Homebrew's bin."""
+    return str(Path(os.path.realpath(shutil.which(name))).parent)
+
+
+class PrTrackerSandbox:
+    def __init__(self, root: Path, *tools: str):
+        self.root = root
+        self.home = root / "home"
+        self.bin = root / "bin"
+        self.out = root / "out"
+        self.work = root / "work"
+        for directory in (self.home, self.bin, self.out, self.work):
+            directory.mkdir()
+        (self.home / "gitconfig").touch()
+        path = os.pathsep.join([str(self.bin), *map(tool_dir, tools), "/usr/bin", "/bin"])
+        assert not shutil.which("pr-tracker", path=path), "a real pr-tracker would leak in"
+        self.env = {
+            "HOME": str(self.home),
+            "PATH": path,
+            "TERM": "dumb",
+            "XDG_CONFIG_HOME": str(self.home / ".config"),
+            "XDG_DATA_HOME": str(self.home / ".local" / "share"),
+            "XDG_CACHE_HOME": str(self.home / ".cache"),
+            "XDG_STATE_HOME": str(self.home / ".local" / "state"),
+            "GIT_CONFIG_GLOBAL": str(self.home / "gitconfig"),
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "PR_TRACKER_STATE_DIR": str(root / "state"),
+            "PR_TRACKER_HOOK_FALLBACK_PATH": "",
+            "STUB_OUT": str(self.out),
+            "STUB_MODE": "ok",
+        }
+
+    def stub(self, mode="ok"):
+        path = self.bin / "pr-tracker"
+        path.write_text(PR_TRACKER_STUB)
+        path.chmod(0o755)
+        self.env["STUB_MODE"] = mode
+
+    def calls(self):
+        return [
+            (
+                (self.out / f"{n}.args").read_text().split(),
+                json.loads((self.out / f"{n}.json").read_text()),
+            )
+            for n in range(len(list(self.out.glob("*.json"))))
+        ]
+
+
+HARNESS = """
+const { default: extension } = await import(process.argv[1]);
+const handlers = {};
+extension({ on: (name, handler) => { handlers[name] = handler; } });
+const notes = [];
+const ctx = {
+  cwd: "/work",
+  sessionManager: { getSessionId: () => "pi-session" },
+  ui: { notify: (message, level) => notes.push([message, level]) },
+};
+const result = (toolName, command) => ({
+  type: "tool_result", toolName, toolCallId: "call-1", input: { command },
+  content: [{ type: "text", text: "https://github.com/owner/repo/pull/7\\n" }],
+  isError: false, details: undefined,
+});
+await handlers.session_start({ type: "session_start", reason: "startup" }, ctx);
+const bash = await handlers.tool_result(result("bash", "gh pr create --fill"), ctx);
+const read = await handlers.tool_result(result("read", undefined), ctx);
+await handlers.agent_settled({ type: "agent_settled" }, ctx);
+console.log(JSON.stringify({ bash: bash ?? null, read: read ?? null, notes }));
+"""
+
+
+def run_harness(sandbox):
+    """Load pr-tracker.ts in node against a fake Pi event API, and fire one bash result,
+    one other tool's result and the end of a run."""
+    stripped = strip_types(PR_TRACKER)
+    assert stripped.returncode == 0, stripped.stderr
+    module = sandbox.root / "pr-tracker.mjs"
+    module.write_text(stripped.stdout)
+    done = subprocess.run(
+        ["node", "--input-type=module", "-e", HARNESS, str(module)],
+        capture_output=True,
+        text=True,
+        env=sandbox.env,
+        cwd=sandbox.work,
+        timeout=30,
+    )
+    assert (done.returncode, done.stderr) == (0, "")
+    return json.loads(done.stdout)
+
+
+needs_strip_types = pytest.mark.skipif(not node_strips_types(), reason="needs node 22.13 or later")
+
+
+@needs_strip_types
+def test_pr_tracker_appends_events_to_a_bash_result(tmp_path):
+    sandbox = PrTrackerSandbox(tmp_path, "node")
+    sandbox.stub()
+    result = run_harness(sandbox)
+    assert result["bash"] == {
+        "content": [
+            {"type": "text", "text": "https://github.com/owner/repo/pull/7\n"},
+            {"type": "text", "text": "\n\nPR #7: checks failing"},
+        ]
+    }
+    assert result["read"] is None
+    assert result["notes"] == [["PR #7: checks failing", "info"]]
+    base = {"session_id": "pi-session", "cwd": "/work"}
+    assert sandbox.calls() == [
+        (
+            ["hook", "post-bash", "--agent", "pi"],
+            {
+                **base,
+                "hook_event_name": "PostToolUse",
+                "tool_name": "Bash",
+                "tool_input": {"command": "gh pr create --fill"},
+                "tool_response": "https://github.com/owner/repo/pull/7\n",
+            },
+        ),
+        (["hook", "stop", "--agent", "pi"], {**base, "hook_event_name": "Stop"}),
+    ]
+
+
+@needs_strip_types
+def test_pr_tracker_without_the_cli_does_nothing(tmp_path):
+    result = run_harness(PrTrackerSandbox(tmp_path, "node"))
+    assert result == {"bash": None, "read": None, "notes": []}
+
+
+@needs_strip_types
+def test_pr_tracker_ignores_a_broken_cli(tmp_path):
+    sandbox = PrTrackerSandbox(tmp_path, "node")
+    sandbox.stub("broken")
+    assert run_harness(sandbox) == {"bash": None, "read": None, "notes": []}
+    assert len(sandbox.calls()) == 2
+
+
+@needs_strip_types
+def test_pr_tracker_finds_the_cli_in_the_fallback_dirs(tmp_path):
+    sandbox = PrTrackerSandbox(tmp_path, "node")
+    sandbox.stub()
+    fallback = tmp_path / "fallback"
+    (sandbox.bin / "pr-tracker").rename(fallback.mkdir() or fallback / "pr-tracker")
+    sandbox.env["PR_TRACKER_HOOK_FALLBACK_PATH"] = str(fallback)
+    assert run_harness(sandbox)["notes"] == [["PR #7: checks failing", "info"]]
+
+
+# A test-only extension: Pi's faux provider stands in for a model and asks for one bash call.
+FAUX_MODEL = """
+import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+
+export default function (pi: ExtensionAPI) {
+\tconst faux = fauxProvider();
+\tfaux.setResponses([
+\t\tfauxAssistantMessage(fauxToolCall("bash", { command: process.env.FAUX_COMMAND })),
+\t\tfauxAssistantMessage("done"),
+\t]);
+\tpi.registerProvider(faux.provider);
+}
+"""
+
+
+FAUX_FLAGS = ("--provider", "faux", "--model", "faux-1")
+
+
+def run_pi_turn(sandbox):
+    """One real Pi run in RPC mode, with the package installed in a throwaway home and a
+    faux model that runs one bash command. Returns Pi's output records."""
+    agent = sandbox.home / ".pi" / "agent"
+    agent.mkdir(parents=True)
+    (agent / "settings.json").write_text(json.dumps({"packages": [str(ROOT)]}))
+    faux = sandbox.root / "faux.ts"
+    faux.write_text(FAUX_MODEL)
+    env = {
+        **sandbox.env,
+        "PI_CODING_AGENT_DIR": str(agent),
+        "PI_CODING_AGENT_SESSION_DIR": str(sandbox.home / "sessions"),
+        "PI_OFFLINE": "1",
+        "PI_SKIP_VERSION_CHECK": "1",
+        "PI_TELEMETRY": "0",
+        "FAUX_COMMAND": "echo https://github.com/owner/repo/pull/7; echo $PI_SESSION_ID",
+    }
+    pi = subprocess.Popen(
+        ["pi", "--mode", "rpc", "--no-session", "-e", str(faux), *FAUX_FLAGS],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        cwd=sandbox.work,
+        env=env,
+    )
+    lines = queue.Queue()
+    threading.Thread(target=lambda: [lines.put(line) for line in pi.stdout], daemon=True).start()
+    done = "extension_ui_request" if (sandbox.bin / "pr-tracker").exists() else "agent_end"
+    records = []
+    try:
+        pi.stdin.write('{"id":"1","type":"prompt","message":"go"}\n')
+        pi.stdin.flush()
+        deadline = time.monotonic() + 60
+        while not records or records[-1].get("type") != done:
+            records.append(json.loads(lines.get(timeout=max(deadline - time.monotonic(), 0))))
+    finally:
+        pi.stdin.close()
+        try:
+            pi.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            pi.kill()
+    assert pi.stderr.read() == ""
+    return records
+
+
+def tool_results(records):
+    return [
+        record["message"]["content"]
+        for record in records
+        if record.get("type") == "message_end" and record["message"]["role"] == "toolResult"
+    ]
+
+
+@needs_pi
+def test_pi_runs_pr_tracker_on_a_real_bash_call(tmp_path):
+    sandbox = PrTrackerSandbox(tmp_path, "pi", "node")
+    sandbox.stub()
+    records = run_pi_turn(sandbox)
+    [(args, post), (stop_args, stop)] = sandbox.calls()
+    session = post["session_id"]
+    assert session and stop["session_id"] == session
+    assert (args, stop_args) == (
+        ["hook", "post-bash", "--agent", "pi"],
+        ["hook", "stop", "--agent", "pi"],
+    )
+    output = f"https://github.com/owner/repo/pull/7\n{session}\n"
+    assert post["tool_response"] == output, "PI_SESSION_ID is the session the hook reports"
+    assert tool_results(records) == [
+        [{"type": "text", "text": output}, {"type": "text", "text": "\n\nPR #7: checks failing"}]
+    ]
+    [note] = [r for r in records if r.get("type") == "extension_ui_request"]
+    assert (note["method"], note["message"]) == ("notify", "PR #7: checks failing")
+
+
+@needs_pi
+def test_pi_without_the_cli_leaves_the_bash_result_alone(tmp_path):
+    records = run_pi_turn(PrTrackerSandbox(tmp_path, "pi", "node"))
+    [[content]] = tool_results(records)
+    assert content["text"].startswith("https://github.com/owner/repo/pull/7\n")
+    assert not [r for r in records if r.get("type") == "extension_ui_request"]
+
+
+@needs_pi
+def test_pi_filter_keeps_only_pr_trackers_skills(tmp_path):
+    commands = run_pi(tmp_path, {"source": str(ROOT), "skills": ["plugins/pr-tracker/skills/*"]})
+    assert {name for name in commands if name.startswith("skill:")} == {
+        "skill:pr-tracker",
+        "skill:prs",
+    }
+    assert "statusline" in commands

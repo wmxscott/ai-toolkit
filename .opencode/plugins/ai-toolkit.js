@@ -1,6 +1,6 @@
 // OpenCode plugin: registers the skills of every ai-toolkit plugin that supports OpenCode.
-// The list is `pi.skills` in package.json, since Pi and OpenCode both load plain skills and
-// nothing else from this repository.
+// The list is `pi.skills` in package.json, less PI_ONLY, since Pi and OpenCode both load
+// plain skills from this repository.
 //
 // OpenCode 1 calls `server` and reads the skill directories from `skills.paths` in its
 // config. OpenCode 2 calls `setup`, whose skill domain takes one skill at a time.
@@ -10,9 +10,16 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
+// Skills that work only beside a Pi extension: pr-tracker's need the hooks that
+// pi/extensions/pr-tracker.ts runs, and OpenCode has neither those nor a session id in
+// its shell.
+const PI_ONLY = ["./plugins/pr-tracker/skills"];
+
 function skillDirs() {
   const manifest = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
-  return (manifest.pi?.skills ?? []).map((dir) => path.resolve(root, dir));
+  return (manifest.pi?.skills ?? [])
+    .filter((dir) => !PI_ONLY.includes(dir))
+    .map((dir) => path.resolve(root, dir));
 }
 
 // Frontmatter here is single-line `key: value` pairs; the repository's tests hold every
