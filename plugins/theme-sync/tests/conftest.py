@@ -131,9 +131,12 @@ class Sandbox:
         return pids
 
     def one_watcher(self):
+        """The single running watcher, once it has armed its watches and written its pid."""
         found = self.wait_for(lambda: len(self.watchers()) == 1 and self.watchers())
         assert found, self.watchers()
-        return found[0]
+        pid = found[0]
+        assert self.wait_for(lambda: self.pidfile() == str(pid)), self.pidfile()
+        return pid
 
     def clients(self):
         folder = self.data / "clients"
