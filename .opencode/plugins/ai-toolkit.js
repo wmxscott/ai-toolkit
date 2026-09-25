@@ -1,6 +1,9 @@
-// OpenCode plugin: adds the skills of every ai-toolkit plugin that supports OpenCode to
-// `skills.paths`. The list is `pi.skills` in package.json, since Pi and OpenCode both load
-// plain skills and nothing else from this repository.
+// OpenCode plugin: registers the skills of every ai-toolkit plugin that supports OpenCode.
+// The list is `pi.skills` in package.json, since Pi and OpenCode both load plain skills and
+// nothing else from this repository.
+//
+// OpenCode 1 calls `server` and reads the skill directories from `skills.paths` in its
+// config. OpenCode 2 calls `setup`, whose skill domain takes one skill at a time.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,10 +15,45 @@ function skillDirs() {
   return (manifest.pi?.skills ?? []).map((dir) => path.resolve(root, dir));
 }
 
-async function AiToolkitPlugin() {
+// Frontmatter here is single-line `key: value` pairs; the repository's tests hold every
+// portable skill to that.
+function readSkill(file) {
+  const match = fs
+    .readFileSync(file, "utf8")
+    .match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  if (!match) return undefined;
+  const fields = {};
+  for (const line of match[1].split(/\r?\n/)) {
+    const field = line.match(/^([\w-]+):\s*(.*)$/);
+    if (field) fields[field[1]] = field[2].trim();
+  }
+  const id = path.basename(path.dirname(file));
+  return {
+    id,
+    name: fields.name || id,
+    ...(fields.description ? { description: fields.description } : {}),
+    path: file,
+    content: match[2],
+  };
+}
+
+function skills() {
+  return skillDirs().flatMap((dir) =>
+    fs.existsSync(dir)
+      ? fs
+          .readdirSync(dir, { withFileTypes: true })
+          .filter((entry) => entry.isDirectory())
+          .map((entry) => path.join(dir, entry.name, "SKILL.md"))
+          .filter((file) => fs.existsSync(file))
+          .map(readSkill)
+          .filter(Boolean)
+      : [],
+  );
+}
+
+async function server() {
   return {
     async config(config) {
-      // OpenCode 2 replaced `skills.paths` with a list; leave that shape alone.
       if (Array.isArray(config.skills)) return;
       config.skills ??= {};
       config.skills.paths ??= [];
@@ -26,4 +64,20 @@ async function AiToolkitPlugin() {
   };
 }
 
-export default { id: "ai-toolkit", server: AiToolkitPlugin };
+async function setup(ctx) {
+  // OpenCode 1 calls this too, with a context that has no skill domain.
+  if (typeof ctx?.skill?.transform !== "function") return;
+  await ctx.skill.transform((editor) => {
+    // A throw escaping the editor disables the whole plugin, so a rejected skill only
+    // skips itself.
+    for (const skill of skills()) {
+      try {
+        editor.add(skill);
+      } catch (error) {
+        console.error(`[ai-toolkit] OpenCode rejected skill ${skill.id}:`, error);
+      }
+    }
+  });
+}
+
+export default { id: "ai-toolkit", server, setup };
