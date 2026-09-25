@@ -53,6 +53,12 @@
       "source": "./plugins/theme-sync",
       "description": "Switches Claude Code between its light and dark themes the moment the macOS appearance changes",
       "category": "productivity"
+    },
+    {
+      "name": "herdr",
+      "source": "./plugins/herdr",
+      "description": "Starts each piece of work in its own git worktree, opened as its own Herdr workspace, with herdr-wkt",
+      "category": "development"
     }
   ]
 }

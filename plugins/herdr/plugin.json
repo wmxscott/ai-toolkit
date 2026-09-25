@@ -1,0 +1,24 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "herdr",
+  "description": "Starts each piece of work in its own git worktree, opened as its own Herdr workspace, with herdr-wkt",
+  "author": {
+    "name": "wmxscott"
+  },
+  "homepage": "https://github.com/wmxscott/ai-toolkit/tree/main/plugins/herdr",
+  "repository": "https://github.com/wmxscott/ai-toolkit",
+  "license": "MIT",
+  "keywords": ["herdr", "git", "worktree", "workspace", "branch"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Herdr",
+        "shortDescription": "Start each piece of work in its own worktree and Herdr workspace",
+        "developerName": "wmxscott",
+        "category": "Developer Tools",
+        "capabilities": ["Read", "Write"],
+        "websiteURL": "https://github.com/wmxscott/ai-toolkit/tree/main/plugins/herdr"
+      }
+    }
+  }
+}
