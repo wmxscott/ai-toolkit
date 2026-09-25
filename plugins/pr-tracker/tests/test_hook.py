@@ -36,6 +36,14 @@ def hook_commands():
     ]
 
 
+def cli_args(command: str) -> list[str]:
+    return command.split('hook.sh"', 1)[1].split()
+
+
+WAIT = next(command for command in hook_commands() if cli_args(command)[:1] == ["wait"])
+BLOCKING = [command for command in hook_commands() if command != WAIT]
+
+
 class Sandbox:
     def __init__(self, root: Path):
         assert not shutil.which("pr-tracker", path=SYSTEM_PATH), "it would leak into the tests"
@@ -102,17 +110,32 @@ def test_runs_the_cli_with_the_mode_and_payload(sandbox, command):
     assert result.returncode == 0
     assert result.stdout == b'{"systemMessage": "PR #1: checks failing"}'
     assert result.stderr == b""
-    assert sandbox.calls() == ["stub", "hook", command.rsplit(" ", 1)[1]]
+    assert sandbox.calls() == ["stub", "hook", *cli_args(command)]
     assert sandbox.stdin_seen() == PAYLOAD
 
 
 @pytest.mark.parametrize("status", [1, 2, 127])
-def test_a_failing_cli_never_reaches_the_session(sandbox, status):
+@pytest.mark.parametrize("command", BLOCKING)
+def test_a_failing_cli_never_reaches_the_session(sandbox, command, status):
     sandbox.stub(sandbox.bin)
     sandbox.env["STUB_STATUS"] = str(status)
-    result = sandbox.run(hook_commands()[-1])
+    result = sandbox.run(command)
     assert (result.returncode, result.stderr) == (0, b"")
     assert sandbox.calls() is not None
+
+
+@pytest.mark.parametrize(("status", "expected"), [(0, 0), (1, 0), (2, 2), (127, 0)])
+def test_only_wait_passes_its_wake_status_through(sandbox, status, expected):
+    """asyncRewake wakes the session on exit 2, with what `wait` printed."""
+    sandbox.stub(sandbox.bin)
+    sandbox.env["STUB_STATUS"] = str(status)
+    sandbox.env["STUB_STDOUT"] = "Tracked pull request updates:"
+    result = sandbox.run(WAIT)
+    assert (result.returncode, result.stdout, result.stderr) == (
+        expected,
+        b"Tracked pull request updates:",
+        b"",
+    )
 
 
 def test_finds_the_cli_off_a_minimal_path(sandbox):
@@ -120,7 +143,7 @@ def test_finds_the_cli_off_a_minimal_path(sandbox):
     sandbox.env["PATH"] = SYSTEM_PATH
     result = sandbox.run(hook_commands()[0])
     assert result.returncode == 0
-    assert sandbox.calls() == ["stub", "hook", "post-bash"]
+    assert sandbox.calls() == ["stub", "hook"]
 
 
 def test_path_wins_over_the_fallback(sandbox):
@@ -182,7 +205,7 @@ def test_codex_payload_reaches_the_cli_unchanged(sandbox):
     result = sandbox.run(hook_commands()[0], CODEX_PAYLOAD)
     assert (result.returncode, result.stderr) == (0, b"")
     assert json.loads(result.stdout) == context
-    assert sandbox.calls() == ["stub", "hook", "post-bash"]
+    assert sandbox.calls() == ["stub", "hook"]
     assert sandbox.stdin_seen() == CODEX_PAYLOAD
 
 

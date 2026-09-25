@@ -1,7 +1,8 @@
 #!/bin/bash
-# Runs `pr-tracker hook <mode>` on the hook payload from stdin. Does nothing when
-# the CLI isn't installed. Always exits 0: a nonzero status, such as argparse's 2
-# from a CLI too old to know <mode>, would block a Stop hook.
+# Runs `pr-tracker hook [<mode>]` on the hook payload from stdin. Does nothing when
+# the CLI isn't installed. Exits 0, since a nonzero status would block a Stop hook,
+# except for `wait`: it runs as an asyncRewake hook, where its exit 2 wakes the
+# idle session with the events it printed.
 #
 # Hooks inherit the agent's PATH, which is minimal when it was started from a
 # GUI, so the usual install locations are tried after it. Claude Code and Codex
@@ -20,4 +21,8 @@ if ! command -v pr-tracker >/dev/null 2>&1; then
 fi
 
 pr-tracker hook "$@" 2>/dev/null
+status=$?
+if [ "${1-}" = wait ] && [ "$status" -eq 2 ]; then
+    exit 2
+fi
 exit 0
