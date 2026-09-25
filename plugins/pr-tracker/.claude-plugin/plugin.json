@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "pr-tracker",
+  "description": "Tracks the pull requests a session opens and tells it when their checks or reviews change, through the pr-tracker CLI",
+  "author": {
+    "name": "wmxscott"
+  },
+  "homepage": "https://github.com/wmxscott/ai-toolkit/tree/main/plugins/pr-tracker",
+  "repository": "https://github.com/wmxscott/ai-toolkit",
+  "license": "MIT",
+  "keywords": ["github", "pull-requests", "ci", "checks", "reviews", "hooks"]
+}
