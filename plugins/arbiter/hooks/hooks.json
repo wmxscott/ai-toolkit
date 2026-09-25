@@ -1,0 +1,16 @@
+{
+  "description": "EXPERIMENTAL: hold the turn open until the repository's arbiter gates pass; a silent no-op in repositories with no arbiter config",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/bin/arbiter\" hook",
+            "timeout": 600
+          }
+        ]
+      }
+    ]
+  }
+}

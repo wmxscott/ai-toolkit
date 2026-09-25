@@ -1,0 +1,42 @@
+{
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "description": "true if the change passes this gate"
+    },
+    "summary": {
+      "type": "string",
+      "description": "One line stating the outcome and why"
+    },
+    "findings": {
+      "type": "array",
+      "description": "Specific defects found in the change; empty when ok is true",
+      "items": {
+        "type": "object",
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": ["high", "medium", "low"]
+          },
+          "file": {
+            "type": "string",
+            "description": "Repository-relative path"
+          },
+          "line": {
+            "type": "integer",
+            "description": "1-indexed line, or 0 if not line-specific"
+          },
+          "issue": {
+            "type": "string",
+            "description": "What is wrong and why it matters"
+          }
+        },
+        "required": ["severity", "file", "line", "issue"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["ok", "summary", "findings"],
+  "additionalProperties": false
+}

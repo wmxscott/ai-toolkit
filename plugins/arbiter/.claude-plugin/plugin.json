@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "arbiter",
+  "description": "EXPERIMENTAL: a Stop hook that holds the turn open until a repository's declared gates pass: lint, tests, build and LLM judges, including cross-model Codex judges",
+  "author": {
+    "name": "wmxscott"
+  },
+  "homepage": "https://github.com/wmxscott/ai-toolkit/tree/experimental/arbiter/plugins/arbiter",
+  "repository": "https://github.com/wmxscott/ai-toolkit",
+  "license": "MIT",
+  "keywords": ["experimental", "quality-gates", "stop-hook", "code-review", "codex", "hooks"]
+}

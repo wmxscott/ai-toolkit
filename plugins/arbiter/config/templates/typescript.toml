@@ -1,0 +1,167 @@
+# arbiter — TypeScript project template
+#
+# Copy into a TypeScript repository, then check what it will do before trusting
+# it:
+#
+#     arbiter init typescript
+#     arbiter plan
+#
+# `init` writes to the repository root whichever subdirectory you run it from.
+#
+# Package manager: every JS command below uses `pnpm exec`. Swap for `npm exec`,
+# `yarn`, or `bunx` to match the project.
+#
+# Prerequisites for the security gates, neither of which is a JS dependency:
+#
+#     brew install opengrep    # SAST
+#     brew install trivy       # dependency + secret scanning
+#
+# Each gate that shells out to a system tool checks for it first and fails with
+# an install hint rather than a bare "command not found". A missing scanner
+# blocks the turn on purpose: silently skipping a security gate is the one
+# outcome worse than a noisy one.
+
+# ---------------------------------------------------------------------------
+# Deterministic gates
+# ---------------------------------------------------------------------------
+
+[[task]]
+name = "typecheck"
+runner = "shell"
+command = "pnpm exec tsc --noEmit"
+paths = ["**/*.ts", "**/*.tsx", "**/tsconfig*.json", "package.json"]
+timeout = 240
+required = true
+
+[[task]]
+name = "lint"
+runner = "shell"
+# `biome ci` is the non-writing form: it checks lint and formatting together and
+# never modifies files, which is what a gate wants. `biome check` can rewrite.
+command = "pnpm exec biome ci ."
+paths = ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.json", "**/biome.json*"]
+timeout = 120
+required = true
+
+[[task]]
+name = "test"
+runner = "shell"
+# Must be the non-watch form. A watch-mode runner never exits and will burn the
+# whole engine budget before timing out.
+command = "pnpm test"
+paths = ["**/*.ts", "**/*.tsx"]
+timeout = 480
+required = true
+
+[[task]]
+name = "sast"
+runner = "shell"
+command = """
+command -v opengrep >/dev/null || { echo 'opengrep not installed: brew install opengrep'; exit 1; }
+opengrep scan --config auto --error --quiet .
+"""
+paths = ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"]
+timeout = 300
+required = true
+
+[[task]]
+name = "sca-secrets"
+runner = "shell"
+# No `paths` filter: a committed credential can appear in any file type, so this
+# gate runs on every change rather than only on dependency manifests.
+command = """
+command -v trivy >/dev/null || { echo 'trivy not installed: brew install trivy'; exit 1; }
+trivy fs --scanners vuln,secret --severity HIGH,CRITICAL --exit-code 1 --no-progress .
+"""
+timeout = 360
+required = true
+
+[[task]]
+name = "cloudformation-bundle-size"
+runner = "shell"
+# For an AWS CDK app; delete this gate otherwise.
+# CloudFormation rejects a template body over 1 MiB when uploaded via S3, and
+# 51,200 bytes when passed inline. Synthesized templates cross that line
+# gradually, so catching it here beats finding out at deploy time.
+command = """
+limit=1048576
+status=0
+found=0
+for f in cdk.out/*.template.json infrastructure/cdk.out/*.template.json; do
+  [ -e "$f" ] || continue
+  found=1
+  size=$(wc -c < "$f" | tr -d ' ')
+  if [ "$size" -gt "$limit" ]; then
+    echo "$f: ${size} bytes exceeds the ${limit} byte CloudFormation limit"
+    status=1
+  fi
+done
+[ "$found" -eq 0 ] && echo 'no synthesized templates found; run the synth step first'
+exit $status
+"""
+paths = ["**/*.ts", "**/cdk.json", "**/template.yaml", "package.json"]
+timeout = 120
+required = true
+
+# ---------------------------------------------------------------------------
+# LLM judges
+#
+# Judges read the repository and write only to their own scratch directory. They
+# cannot modify the code they review; that boundary is enforced by the OS
+# sandbox, not by their instructions.
+#
+# `effort` sets reasoning depth. Accepted values differ by runner:
+# claude takes low|medium|high|xhigh|max, codex takes minimal|low|medium|high|
+# xhigh. Higher effort costs more time against the engine budget.
+# ---------------------------------------------------------------------------
+
+[[task]]
+name = "security-review"
+runner = "claude"
+agent = "security-reviewer"
+model = "opus"
+effort = "high"
+paths = ["**/*.ts", "**/*.tsx"]
+timeout = 300
+required = true
+
+[[task]]
+name = "scalability-review"
+runner = "claude"
+agent = "scalability-reviewer"
+model = "sonnet"
+effort = "medium"
+paths = ["**/*.ts", "**/*.tsx", "**/*.sql", "**/migrations/**"]
+timeout = 300
+# Advisory: scaling findings are usually judgement calls about future load, so
+# they are worth surfacing without holding the turn. Flip to true once the
+# project's thresholds are settled.
+required = false
+
+[[task]]
+name = "codex-review"
+runner = "codex"
+# A different model family auditing the same change. The value is the
+# independence, so this judge gets no shared persona with the Claude reviewers.
+prompt = """
+Review this change as an independent second opinion from a different model
+family than the one that wrote it.
+
+Look for:
+- Behaviour the change breaks for existing callers: removed or renamed exports,
+  narrowed types, changed defaults, and enum values downstream code will not
+  recognise.
+- Error paths that swallow failures, retry non-idempotent work, or leave state
+  half-written.
+- Ordering and race conditions between concurrent callers.
+- Personal or secret data entering responses or logs.
+
+Report only defects you can point at in the diff. If the change is safe, pass
+and say why in one line.
+"""
+effort = "high"
+paths = ["**/*.ts", "**/*.tsx"]
+timeout = 360
+# Advisory until the project trusts it: a second opinion that blocks on every
+# judgement call trains people to switch it off.
+required = false

@@ -1,0 +1,39 @@
+# arbiter — built-in baseline gates
+#
+# This layer ships with the plugin. It joins only when a repository or the user
+# has config of their own, so on its own it gates nothing. Users override it in
+# ~/.config/arbiter/defaults.toml, projects add gates in <repo>/arbiter.toml,
+# and personal overrides go in <repo>/arbiter.local.toml. Later layers override
+# earlier ones by task name.
+#
+# Tasks here are disabled by default: a baseline gate that fires in every repo
+# without being asked for is a surprise. Enable one for every repository in
+# ~/.config/arbiter/defaults.toml, or per project in the repo's arbiter.toml:
+#
+#     [[task]]
+#     name = "security"
+#     enabled = true
+
+[arbiter]
+# Total wall-clock ceiling for a single gate run, in seconds. Stays under the
+# Stop hook's 600s limit, past which the hook renders no decision and the turn
+# ends silently.
+budget = 540
+
+[[task]]
+name = "security"
+runner = "codex"
+agent = "security-reviewer"
+effort = "high"
+enabled = false
+required = true
+timeout = 240
+
+[[task]]
+name = "scalability"
+runner = "codex"
+agent = "scalability-reviewer"
+effort = "medium"
+enabled = false
+required = false
+timeout = 240

@@ -65,6 +65,12 @@
       "source": "./plugins/herdr",
       "description": "Starts each piece of work in its own git worktree, opened as its own Herdr workspace, with herdr-wkt",
       "category": "development"
+    },
+    {
+      "name": "arbiter",
+      "source": "./plugins/arbiter",
+      "description": "EXPERIMENTAL: a Stop hook that holds the turn open until a repository's declared gates pass: lint, tests, build and LLM judges, including cross-model Codex judges",
+      "category": "development"
     }
   ]
 }
