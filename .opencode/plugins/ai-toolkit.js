@@ -65,7 +65,7 @@ async function server() {
 }
 
 async function setup(ctx) {
-  // OpenCode 1 calls this too, with a context that has no skill domain.
+  // OpenCode 1 (1.18.32) never calls this, but a host without a skill domain must not break it.
   if (typeof ctx?.skill?.transform !== "function") return;
   await ctx.skill.transform((editor) => {
     // A throw escaping the editor disables the whole plugin, so a rejected skill only

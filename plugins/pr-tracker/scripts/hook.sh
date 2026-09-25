@@ -3,11 +3,12 @@
 # the CLI isn't installed. Always exits 0: a nonzero status, such as argparse's 2
 # from a CLI too old to know <mode>, would block a Stop hook.
 #
-# Hooks inherit Claude Code's PATH, which is minimal when it was started from a
-# GUI, so the usual install locations are tried after it.
+# Hooks inherit the agent's PATH, which is minimal when it was started from a
+# GUI, so the usual install locations are tried after it. Claude Code and Codex
+# both run this, and it needs nothing from either beyond the payload.
 # PR_TRACKER_HOOK_FALLBACK_PATH replaces those locations, for tests.
 
-fallback=${PR_TRACKER_HOOK_FALLBACK_PATH-/opt/homebrew/bin:/usr/local/bin:/home/linuxbrew/.linuxbrew/bin:$HOME/.local/bin}
+fallback=${PR_TRACKER_HOOK_FALLBACK_PATH-/opt/homebrew/bin:/usr/local/bin:/home/linuxbrew/.linuxbrew/bin${HOME:+:$HOME/.local/bin}}
 if [ -n "$fallback" ]; then
     PATH="${PATH:+$PATH:}$fallback"
     export PATH

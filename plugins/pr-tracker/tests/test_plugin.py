@@ -7,6 +7,7 @@ import pytest
 PLUGIN = Path(__file__).resolve().parent.parent
 HOOKS = json.loads((PLUGIN / "hooks" / "hooks.json").read_text())["hooks"]
 WRAPPER = r'bash "\$\{CLAUDE_PLUGIN_ROOT\}/scripts/hook\.sh" '
+PRINT_SESSION = "printenv CLAUDE_CODE_SESSION_ID CODEX_SESSION_ID PI_SESSION_ID"
 
 
 def frontmatter(skill):
@@ -40,6 +41,7 @@ def test_hooks_call_the_cli_modes():
         "mcp__github__create_pull_request",
         "mcp__plugin_github_github__create_pull_request",
         "mcp__my-github-server__create_pull_request",
+        "mcp__codex_apps__github__create_pull_request",
     ],
 )
 def test_mcp_matcher_catches_github_servers(tool):
@@ -67,21 +69,45 @@ def test_prs_is_a_user_command():
     }
     assert fields["name"] == "prs"
     assert fields["disable-model-invocation"] == "true"
-    assert fields["allowed-tools"] == "Bash(pr-tracker list *)"
-    assert 'pr-tracker list --scope session --session "${CLAUDE_SESSION_ID}"' in body
-    assert "prs --session ${CLAUDE_SESSION_ID}" in body
+    assert fields["allowed-tools"] == f"Bash(pr-tracker list *) Bash({PRINT_SESSION})"
+    assert re.search(r"^pr-tracker list --scope session$", body, re.M)
+    assert re.search(rf"^{PRINT_SESSION}$", body, re.M)
+    assert "prs --session <id>" in body
+
+
+def test_prs_reads_arguments_where_they_are_not_substituted():
+    """Claude Code replaces `$ARGUMENTS`; Codex and Pi leave it, so the skill says where
+    the arguments are then. Claude Code replaces every occurrence, so there's only one."""
+    _, body = frontmatter("prs")
+    assert body.count("$ARGUMENTS") == 1
+    assert "whatever the user typed after the skill's name" in body
 
 
 @pytest.mark.parametrize("skill", ["pr-tracker", "prs"])
-def test_skills_call_the_cli_and_pass_the_session(skill):
+def test_skills_leave_the_session_to_the_cli(skill):
+    """pr-tracker 1.1.0 reads the session id from the variable each agent exports to its
+    shell, so a skill works unchanged in Claude Code, Codex and Pi."""
     _, body = frontmatter(skill)
     commands = re.findall(r"^pr-tracker .+$", body, re.M)
     assert commands
     for command in commands:
-        if command.split()[1] in {"adopt", "untrack"} or "--scope session" in command:
-            assert '--session "${CLAUDE_SESSION_ID}"' in command, command
+        assert "--session" not in command, command
+    assert "CLAUDE_SESSION_ID" not in body
+    assert not re.search(r"\$\{\w+\}", body)
+    assert "1.1.0" in body
     assert "python" not in body
     assert "CLAUDE_PLUGIN_ROOT" not in body
+
+
+def openai_yaml(skill):
+    return PLUGIN / "skills" / skill / "agents" / "openai.yaml"
+
+
+def test_codex_never_invokes_prs_by_itself():
+    """Codex ignores `disable-model-invocation`; its equivalent is the skill's
+    agents/openai.yaml. `$pr-tracker:prs` still runs it."""
+    assert openai_yaml("prs").read_text() == "policy:\n  allow_implicit_invocation: false\n"
+    assert not openai_yaml("pr-tracker").exists()
 
 
 def test_no_fixed_install_paths():

@@ -10,16 +10,16 @@ The plugin's hooks record every PR this session opens with `gh pr create`, `gh s
 
 This skill covers what the hooks can't see, and reading the current state.
 
-This session's id is `${CLAUDE_SESSION_ID}`. Pass it with `--session` as shown: your shell doesn't have it in the environment the CLI reads.
+The CLI reads this session's id from the environment your agent gives its shell, so the commands below don't pass `--session`.
 
-If `pr-tracker` isn't on `PATH`, tell the user the plugin needs the pr-tracker CLI (`brew install wmxscott/tap/pr-tracker && brew services start pr-tracker`) and stop.
+If `pr-tracker` isn't on `PATH`, tell the user the plugin needs the pr-tracker CLI (`brew install wmxscott/tap/pr-tracker && brew services start pr-tracker`) and stop. If a command says it has no session, the CLI is older than 1.1.0: tell the user to upgrade it (`brew upgrade pr-tracker`) and stop.
 
 ## Adopt a PR the hooks missed
 
 A PR opened in the GitHub web UI, by another tool, or by an earlier session isn't attached to this one. Attach it:
 
 ```bash
-pr-tracker adopt <url|number> --session "${CLAUDE_SESSION_ID}"
+pr-tracker adopt <url|number>
 ```
 
 With no URL or number it adopts the current branch's PR. A number or branch resolves through `gh` in the current directory, so run it inside the repository, or add `--cwd <repo>`.
@@ -27,7 +27,7 @@ With no URL or number it adopts the current branch's PR. A number or branch reso
 ## Read the current state
 
 ```bash
-pr-tracker list --scope session --session "${CLAUDE_SESSION_ID}"
+pr-tracker list --scope session
 ```
 
 This session's PRs as JSON, stacked PRs after their base. `--scope open` lists every open PR across sessions, `--scope all` merged and closed ones too. The fields that matter:
@@ -65,7 +65,7 @@ It prints nothing outside a terminal. Run `list` afterwards to see the result.
 ## Stop tracking a PR
 
 ```bash
-pr-tracker untrack <url|owner/repo#number> --session "${CLAUDE_SESSION_ID}"
+pr-tracker untrack <url|owner/repo#number>
 ```
 
 ## Don't

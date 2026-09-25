@@ -43,12 +43,32 @@ INTERFACE_STRINGS = {
 INTERFACE_LISTS = {"capabilities", "defaultPrompt"}
 
 
+def codex_manifest_path(name):
+    """The root plugin.json, in the Agent Plugins format, or for a plugin with hooks
+    .codex-plugin/plugin.json: Codex 0.156.1 loads no hooks for an Agent Plugins manifest."""
+    for path in (PLUGINS / name / "plugin.json", PLUGINS / name / ".codex-plugin" / "plugin.json"):
+        if path.is_file():
+            return path
+    return None
+
+
 def codex_plugins():
-    return sorted(p.parent.name for p in PLUGINS.glob("*/plugin.json"))
+    return sorted(p.name for p in PLUGINS.iterdir() if p.is_dir() and codex_manifest_path(p.name))
 
 
 def codex_manifest(name):
-    return json.loads((PLUGINS / name / "plugin.json").read_text())
+    return json.loads(codex_manifest_path(name).read_text())
+
+
+def is_agent_plugins_manifest(name):
+    return codex_manifest_path(name).parent.name == name
+
+
+def codex_interface(name):
+    manifest = codex_manifest(name)
+    if is_agent_plugins_manifest(name):
+        return manifest.get("extensions", {}).get("com.openai", {}).get("interface", {})
+    return manifest.get("interface", {})
 
 
 def claude_manifest(name):
@@ -75,8 +95,18 @@ def test_every_codex_plugin_is_listed():
     assert set(names) == set(codex_plugins())
 
 
-def test_only_the_portable_manifest_is_used():
-    assert not list(PLUGINS.glob("*/.codex-plugin")), "use plugins/<name>/plugin.json"
+@pytest.mark.parametrize("name", codex_plugins())
+def test_one_codex_manifest_in_the_format_that_keeps_hooks(name):
+    root = PLUGINS / name / "plugin.json"
+    legacy = PLUGINS / name / ".codex-plugin" / "plugin.json"
+    assert not (root.exists() and legacy.exists()), "Codex reads only the root manifest"
+    has_hooks = (PLUGINS / name / "hooks" / "hooks.json").is_file()
+    assert legacy.exists() == has_hooks, "hooks need .codex-plugin/plugin.json, else plugin.json"
+
+
+def test_no_stray_codex_manifest_directories():
+    for directory in PLUGINS.glob("*/.codex-plugin"):
+        assert sorted(p.name for p in directory.iterdir()) == ["plugin.json"], directory
 
 
 @pytest.mark.parametrize("entry", ENTRIES, ids=lambda e: e["name"])
@@ -88,7 +118,7 @@ def test_entry_shape(entry):
     assert isinstance(entry["category"], str) and entry["category"]
 
 
-@pytest.mark.parametrize("name", codex_plugins())
+@pytest.mark.parametrize("name", [n for n in codex_plugins() if is_agent_plugins_manifest(n)])
 def test_manifest_matches_agent_plugins_schema(name):
     errors = [e.message for e in Draft202012Validator(SCHEMA).iter_errors(codex_manifest(name))]
     assert not errors
@@ -101,13 +131,22 @@ def test_manifest_agrees_with_claude_manifest(name):
         assert codex.get(field) == claude.get(field), field
 
 
+@pytest.mark.parametrize("name", [n for n in codex_plugins() if not is_agent_plugins_manifest(n)])
+def test_codex_format_manifest_shape(name):
+    """Codex's own format: the shared fields plus a top-level `interface`. Hooks come from
+    hooks/hooks.json, like Claude Code's."""
+    manifest = codex_manifest(name)
+    assert set(manifest) <= {*SHARED_FIELDS, "interface"}
+
+
 @pytest.mark.parametrize("name", codex_plugins())
 def test_openai_extension(name):
-    extensions = codex_manifest(name).get("extensions", {})
-    assert set(extensions) <= {"com.openai"}
-    openai = extensions.get("com.openai", {})
-    assert set(openai) <= {"interface", "hooks", "apps"}
-    interface = openai.get("interface", {})
+    if is_agent_plugins_manifest(name):
+        extensions = codex_manifest(name).get("extensions", {})
+        assert set(extensions) <= {"com.openai"}
+        openai = extensions.get("com.openai", {})
+        assert set(openai) <= {"interface", "hooks", "apps"}
+    interface = codex_interface(name)
     assert set(interface) <= INTERFACE_STRINGS | INTERFACE_LISTS | {
         "composerIcon",
         "logo",
