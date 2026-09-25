@@ -9,8 +9,9 @@ file. With neither, nothing happens. macOS only: anywhere else both commands
 are silent no-ops.
 
 One watcher runs per data dir. It holds an exclusive lock on DATA_DIR/watcher.pid
-for its whole life and sleeps in kqueue until the trigger file changes, a
-registered Claude Code process exits, or a client registers in DATA_DIR/clients.
+for its whole life, and writes its pid there once all its watches are armed. It
+sleeps in kqueue until the trigger file changes, a registered Claude Code process
+exits, or a client registers in DATA_DIR/clients.
 It exits once no registered client is left, or when the theme file, the data
 dir or theme-monitor's folder goes away.
 """
@@ -224,8 +225,12 @@ def acquire(data: str) -> int | None:
     fd = try_lock(data)
     if fd is not None:
         os.ftruncate(fd, 0)
-        os.write(fd, f"{os.getpid()}\n".encode())
     return fd
+
+
+def announce(fd: int) -> None:
+    os.ftruncate(fd, 0)
+    os.pwrite(fd, f"{os.getpid()}\n".encode(), 0)
 
 
 def release(fd: int) -> None:
@@ -359,6 +364,7 @@ class Watcher:
         self.lock = acquire(self.data)
         if self.lock is None:
             raise Stop
+        announce(self.lock)
 
     def setup(self) -> None:
         # Arm every watch before reading what it covers, so no change is missed.
@@ -372,9 +378,11 @@ class Watcher:
                 raise Stop
         self.arm_trigger()
         if not os.path.isfile(theme_path()):
-            raise Stop
+            self.theme_missing_since = time.monotonic()
         self.rescan()
         self.update()
+        if self.lock is not None:
+            announce(self.lock)
 
     def handle(self, event) -> bool:
         """Process one event. Returns whether the trigger may have changed."""

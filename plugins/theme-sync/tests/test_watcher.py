@@ -255,6 +255,35 @@ def run_watch(sandbox):
     )
 
 
+def test_starts_while_the_theme_file_is_briefly_missing(sandbox, ts):
+    sandbox.enable()
+    sandbox.set_trigger("dark")
+    assert ts.register(str(sandbox.data), os.getpid())
+    backup = sandbox.theme.with_name("theme-sync.json~")
+    os.rename(sandbox.theme, backup)
+    proc = run_watch(sandbox)
+    try:
+        assert sandbox.wait_for(lambda: sandbox.pidfile() == str(proc.pid))
+        os.rename(backup, sandbox.theme)
+        time.sleep(2.5)
+        assert proc.poll() is None
+        sandbox.set_trigger("light")
+        assert sandbox.wait_for(lambda: sandbox.base() == "light", timeout=1)
+    finally:
+        proc.kill()
+        proc.wait()
+
+
+def test_starting_without_the_theme_file_exits_after_the_grace(sandbox, ts):
+    sandbox.enable()
+    sandbox.set_trigger("dark")
+    assert ts.register(str(sandbox.data), os.getpid())
+    sandbox.theme.unlink()
+    proc = run_watch(sandbox)
+    assert proc.wait(timeout=10) == 0
+    assert not sandbox.theme.exists()
+
+
 def test_watch_exits_at_once_when_another_holds_the_lock(sandbox, ts):
     sandbox.enable()
     sandbox.set_trigger("dark")
