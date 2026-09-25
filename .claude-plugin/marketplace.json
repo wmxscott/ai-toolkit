@@ -59,6 +59,12 @@
       "source": "./plugins/pr-tracker",
       "description": "Tracks the pull requests a session opens and tells it when their checks or reviews change, through the pr-tracker CLI",
       "category": "development"
+    },
+    {
+      "name": "herdr",
+      "source": "./plugins/herdr",
+      "description": "Starts each piece of work in its own git worktree, opened as its own Herdr workspace, with herdr-wkt",
+      "category": "development"
     }
   ]
 }
