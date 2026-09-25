@@ -267,7 +267,7 @@ esac
 NEWS = "PR #7: checks failing"
 MESSAGE = {"customType": "pr-tracker", "content": NEWS, "display": True}
 AS_PI = ["hook", "--agent", "pi"]
-STOP = ["hook", "stop", "--agent", "claude"]
+STOP = ["hook", "stop", "--agent", "pi"]
 
 
 def test_package_carries_pr_trackers_extension_and_skills():

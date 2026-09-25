@@ -6,7 +6,7 @@ The plugin is a thin layer: hooks that call the CLI (in Pi, an extension), a ski
 
 ## Install
 
-The plugin needs pr-tracker 1.1.0 or later and its background service. Delivery on every tool call and prompt, and waking an idle session, need 1.2.0; older versions ignore those hooks:
+The plugin needs pr-tracker 1.1.0 or later and its background service. Delivery on every tool call and prompt, and waking an idle Claude Code session, need 1.2.0; continuing a Codex turn and continuing or waking a Pi session need 1.2.1. Older versions ignore those hooks:
 
 ```sh
 brew install wmxscott/tap/pr-tracker
@@ -64,7 +64,7 @@ OpenCode isn't supported, so the ai-toolkit OpenCode plugin leaves these skills 
 | `Stop` | `pr-tracker hook stop` | When failing checks or a review decision are queued, hands them to Claude so it keeps going, once per turn. Otherwise shows you the queued changes, leaving them queued |
 | `Stop`, `asyncRewake` | `pr-tracker hook wait --for 3540` | Claude Code only (Pi's extension polls instead). Waits in the background after a turn for failing checks or a review decision, then wakes the idle session with them |
 
-Claude Code and Codex load the same `hooks/hooks.json`. Codex sends the same payload, with `Bash` as the shell tool's name, and the CLI records its sessions as `codex`. The CLI also recognises Codex's GitHub connector, `mcp__codex_apps__github__create_pull_request`. `wait` returns at once in Codex, which has no `asyncRewake`, and Codex sessions only see `stop`'s message, not a continued turn. Codex shows the `Stop` message in its TUI only, not in `codex exec`. A Codex subagent's hooks carry the parent's session id, so a PR it opens belongs to the parent session, and its events reach the parent, never the subagent. Recording is offline and takes a few milliseconds. The CLI's README documents the [hook contract](https://github.com/wmxscott/pr-tracker#the-hook-contract).
+Claude Code and Codex load the same `hooks/hooks.json`. Codex sends the same payload, with `Bash` as the shell tool's name, and the CLI records its sessions as `codex`. The CLI also recognises Codex's GitHub connector, `mcp__codex_apps__github__create_pull_request`. `wait` returns at once in Codex, which has no `asyncRewake`, so an idle Codex session isn't woken. From 1.2.1, `stop` continues a Codex turn for failing checks or a review decision. Codex has no `PostToolUseFailure`, so a failed tool call there delivers nothing. Codex shows the `Stop` message in its TUI only, not in `codex exec`. A Codex subagent's hooks carry the parent's session id, so a PR it opens belongs to the parent session, and its events reach the parent, never the subagent. Recording is offline and takes a few milliseconds. The CLI's README documents the [hook contract](https://github.com/wmxscott/pr-tracker#the-hook-contract).
 
 Each hook goes through `scripts/hook.sh`, which:
 

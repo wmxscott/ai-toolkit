@@ -78,14 +78,14 @@ Pi's half of the [pr-tracker plugin](../plugins/pr-tracker): it does in Pi what 
 |---|---|---|
 | `tool_result`, every tool | `pr-tracker hook --agent pi` | Records a PR a `bash` call created, even one that failed, then appends queued check and review changes to the tool's output, where the model reads them |
 | `before_agent_start` | `pr-tracker hook --agent pi` | Delivers queued changes along with your prompt |
-| `agent_before_settle` | `pr-tracker hook stop --agent claude` | When failing checks or a review decision are queued, hands them to the agent so the run keeps going, once per run. Otherwise shows you the queued changes as a notification, leaving them queued |
-| `agent_settled` | `pr-tracker hook stop --agent claude`, every 30 seconds | In the terminal UI and RPC mode, after a run that wasn't aborted or failed: waits up to 59 minutes for failing checks or a review decision, then wakes the idle session with them. The next run stops it |
+| `agent_before_settle` | `pr-tracker hook stop --agent pi` | When failing checks or a review decision are queued, hands them to the agent so the run keeps going, once per run. Otherwise shows you the queued changes as a notification, leaving them queued |
+| `agent_settled` | `pr-tracker hook stop --agent pi`, every 30 seconds | In the terminal UI and RPC mode, after a run that wasn't aborted or failed: waits up to 59 minutes for failing checks or a review decision, then wakes the idle session with them. The next run stops it |
 
 The tool events carry Pi's tool name, and the CLI decides from it: it records from `bash`, and from any tool whose name ends in `create_pull_request`, as an extension's GitHub MCP tool might. Everything the extension hands the model shows in the transcript as a `pr-tracker` message.
 
-The CLI only continues a run at `Stop` for Claude Code, and its `hook wait`, which wakes idle Claude Code sessions, runs for no other agent. So the extension runs `stop` as `claude`, and polls it rather than waiting. `stop` records nothing, so the session keeps its `pi` label. Set `notify.wake = false` in pr-tracker's settings to turn off continuing and waking.
+Set `notify.wake = false` in pr-tracker's settings to turn off continuing and waking.
 
-It needs pr-tracker 1.1.0 or later, and 1.2.0 for delivery on every tool and prompt, continuing and waking; 1.1.0 records PRs from `bash`, delivers after it and notifies. The [plugin's README](../plugins/pr-tracker/README.md) covers installing it. It looks for `pr-tracker` on `PATH`, then in `/opt/homebrew/bin`, `/usr/local/bin`, `/home/linuxbrew/.linuxbrew/bin` and `~/.local/bin`, once per session. Without it, the extension does nothing. It never fails a tool call: a missing, slow (10 seconds) or broken CLI leaves the result as it was.
+It needs pr-tracker 1.1.0 or later, 1.2.0 for delivery on every tool and prompt, and 1.2.1 for continuing and waking. Older versions only show the changes as a notification at the end of a run. The [plugin's README](../plugins/pr-tracker/README.md) covers installing it. It looks for `pr-tracker` on `PATH`, then in `/opt/homebrew/bin`, `/usr/local/bin`, `/home/linuxbrew/.linuxbrew/bin` and `~/.local/bin`, once per session. Without it, the extension does nothing. It never fails a tool call: a missing, slow (10 seconds) or broken CLI leaves the result as it was.
 
 Pi has no MCP support of its own, so most PRs it records come from `bash`. `pr-tracker adopt` attaches any other.
 

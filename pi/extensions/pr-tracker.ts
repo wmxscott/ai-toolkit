@@ -13,10 +13,7 @@ const POLL_MS = 30_000;
 const WAIT_MS = 3_540_000;
 const MESSAGE_TYPE = "pr-tracker";
 const AS_PI = ["--agent", "pi"];
-// `hook stop` hands events to the agent, rather than only showing them, for claude alone,
-// and `hook wait` runs for no one else. Pi can continue a run and wake an idle one, so it
-// asks `stop` as claude. Stop records nothing, so the session keeps its pi label.
-const STOP = ["stop", "--agent", "claude"];
+const STOP = ["stop", ...AS_PI];
 
 type HookOutput = {
 	systemMessage?: unknown;
