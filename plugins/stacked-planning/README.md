@@ -36,7 +36,7 @@ Pi:
 pi install git:github.com/wmxscott/ai-toolkit
 ```
 
-OpenCode: add the repository to `plugin` in `opencode.json` and restart OpenCode.
+OpenCode: add the repository to `opencode.json` and restart OpenCode. The key is `plugin` in OpenCode 1 and `plugins` in OpenCode 2.
 
 ```json
 {
@@ -96,7 +96,7 @@ All four agents load the same `skills/` directory:
 | Claude Code | `.claude-plugin/plugin.json` |
 | Codex | `plugin.json` ([Agent Plugins](https://agent-plugins.org) format) |
 | Pi | the repository's root `package.json`, `pi.skills` |
-| OpenCode | the repository's root plugin, `.opencode/plugins/ai-toolkit.js`, which adds this `skills/` directory to `skills.paths` |
+| OpenCode | the repository's root plugin, `.opencode/plugins/ai-toolkit.js`, which adds this `skills/` directory to `skills.paths` in OpenCode 1 and registers each skill through `ctx.skill.transform` in OpenCode 2 |
 
 The skills find their bundled files relative to their own directory, which each agent reports when it loads a skill, not through an agent-specific variable such as `${CLAUDE_PLUGIN_ROOT}`. The gate scripts live in `authoring-stacked-plans`, and `implementing-stacked-plans` reaches them as `../authoring-stacked-plans/scripts`, so install the skills together.
 

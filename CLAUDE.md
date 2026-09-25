@@ -56,7 +56,7 @@ Leave `version` out of both manifests (the tests require them to agree). Codex t
 
 Pi and OpenCode have no marketplace; both load plain [Agent Skills](https://agentskills.io/specification) and nothing else from this repository. So a plugin supports both or neither, and only when its skills work without Claude-only parts. Such a plugin must support Codex too.
 
-1. Add `./plugins/<name>/skills` to `pi.skills` in the root `package.json`. That list is what `pi install git:github.com/wmxscott/ai-toolkit` loads, and `.opencode/plugins/ai-toolkit.js` (the package's `main`, loaded through `"plugin": ["ai-toolkit@git+https://github.com/wmxscott/ai-toolkit.git"]`) reads the same list into OpenCode's `skills.paths`. Keep the package `private`, with no dependencies, and add no root `skills/`, `extensions/`, `prompts/` or `themes/`: Pi would load them from every install.
+1. Add `./plugins/<name>/skills` to `pi.skills` in the root `package.json`. That list is what `pi install git:github.com/wmxscott/ai-toolkit` loads, and `.opencode/plugins/ai-toolkit.js` (the package's `main`, loaded through `"plugin": ["ai-toolkit@git+https://github.com/wmxscott/ai-toolkit.git"]`) reads the same list. The module's default export carries both OpenCode plugin shapes: `server`, whose config hook adds the directories to `skills.paths` (OpenCode 1, config key `plugin`), and `setup`, which adds each skill through `ctx.skill.transform` (OpenCode 2, config key `plugins`). OpenCode 1 calls `setup` as well, so it returns early without a skill domain. OpenCode 2 resolves a git or npm install through the package `main`, so keep it pointing at the module. Keep the package `private`, with no dependencies, and add no root `skills/`, `extensions/`, `prompts/` or `themes/`: Pi would load them from every install.
 2. Tick the Pi and OpenCode columns in the `README.md` table, and give the plugin's README an install section per agent.
 3. Make the skills portable:
    - Frontmatter is `name` (the directory name) and `description` (at most 1024 characters, strict YAML: no `: ` in a plain scalar, or a strict parser drops the skill).
@@ -64,7 +64,7 @@ Pi and OpenCode have no marketplace; both load plain [Agent Skills](https://agen
    - A file shared by several skills lives in one of them and the others reach it as `../<skill>/...`. Pi and OpenCode load the skills in place and Claude Code and Codex copy the whole plugin, so sibling paths hold in all four.
    - Run scripts through their interpreter (`uv run --script x.py`, `python3 x.py`) rather than relying on the executable bit.
 
-`tests/test_agents.py` checks the package, the OpenCode module, that Claude, Codex and Pi load the same skills, and the README columns.
+`tests/test_agents.py` checks the package, the OpenCode module under fake OpenCode 1 and 2 contexts (with node), that Claude, Codex and Pi load the same skills, and the README columns.
 
 ## Checks
 

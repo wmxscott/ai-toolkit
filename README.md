@@ -59,11 +59,19 @@ pi install git:github.com/wmxscott/ai-toolkit
 
 ### OpenCode
 
-The repository is also an [OpenCode plugin](https://opencode.ai/docs/plugins/) that registers the same skills. Add it to `opencode.json`, then restart OpenCode:
+The repository is also an [OpenCode plugin](https://opencode.ai/docs/plugins/) that registers the same skills. Add it to `opencode.json`, then restart OpenCode. OpenCode 1:
 
 ```json
 {
   "plugin": ["ai-toolkit@git+https://github.com/wmxscott/ai-toolkit.git"]
+}
+```
+
+OpenCode 2 (`opencode2`, 2.0.4 or later) names the key `plugins`:
+
+```json
+{
+  "plugins": ["ai-toolkit@git+https://github.com/wmxscott/ai-toolkit.git"]
 }
 ```
 
