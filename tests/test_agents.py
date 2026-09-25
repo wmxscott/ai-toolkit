@@ -73,9 +73,13 @@ def test_pi_sees_only_the_listed_skills():
 def test_every_agent_loads_the_same_skills(name):
     plugin = PLUGINS / name
     claude = json.loads((plugin / ".claude-plugin" / "plugin.json").read_text())
-    codex_manifest = plugin / "plugin.json"
-    assert codex_manifest.is_file(), "a Pi or OpenCode plugin must support Codex too"
-    codex = json.loads(codex_manifest.read_text())
+    codex_manifests = [
+        path
+        for path in (plugin / "plugin.json", plugin / ".codex-plugin" / "plugin.json")
+        if path.is_file()
+    ]
+    assert codex_manifests, "a Pi or OpenCode plugin must support Codex too"
+    codex = json.loads(codex_manifests[0].read_text())
     pi = skills_in(plugin / "skills")
     assert pi
     assert manifest_skills(plugin, claude) == pi
@@ -179,7 +183,7 @@ def test_opencode_2_setup_adds_every_skill():
 
 @needs_node
 def test_setup_ignores_an_opencode_1_context():
-    """OpenCode 1 calls `setup` too, with no skill domain; it must neither throw nor act."""
+    """A context without a skill domain must neither throw nor act."""
     assert run_module("await plugin.setup({}); await plugin.setup(undefined); console.log(1);") == 1
 
 

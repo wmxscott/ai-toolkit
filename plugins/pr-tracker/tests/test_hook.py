@@ -151,3 +151,46 @@ def test_empty_fallback_leaves_path_alone(sandbox):
     sandbox.env["PR_TRACKER_HOOK_FALLBACK_PATH"] = ""
     result = sandbox.run(hook_commands()[0])
     assert result.stdout.decode() == sandbox.env["PATH"]
+
+
+CODEX_PAYLOAD = json.dumps(
+    {
+        "session_id": "019a0000-0000-7000-8000-000000000000",
+        "turn_id": "019a0000-0000-7000-8000-000000000001",
+        "transcript_path": None,
+        "cwd": "/tmp/project",
+        "hook_event_name": "PostToolUse",
+        "model": "gpt-5.5",
+        "permission_mode": "default",
+        "tool_name": "Bash",
+        "tool_use_id": "call-1",
+        "tool_input": {"command": "gh pr create --fill"},
+        "tool_response": "https://github.com/owner/repo/pull/7\n",
+    }
+).encode()
+
+
+def test_codex_payload_reaches_the_cli_unchanged(sandbox):
+    """Codex sets CLAUDE_PLUGIN_ROOT for plugin hooks and sends a Claude-shaped payload with
+    Codex's own keys, such as `turn_id`. Nothing else from Claude Code is in its environment."""
+    assert not [
+        key for key in sandbox.env if key.startswith("CLAUDE_") and key != "CLAUDE_PLUGIN_ROOT"
+    ]
+    sandbox.stub(sandbox.bin)
+    context = {"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": "x"}}
+    sandbox.env["STUB_STDOUT"] = json.dumps(context)
+    result = sandbox.run(hook_commands()[0], CODEX_PAYLOAD)
+    assert (result.returncode, result.stderr) == (0, b"")
+    assert json.loads(result.stdout) == context
+    assert sandbox.calls() == ["stub", "hook", "post-bash"]
+    assert sandbox.stdin_seen() == CODEX_PAYLOAD
+
+
+def test_runs_without_home_or_the_plugin_root(sandbox):
+    sandbox.stub(sandbox.fallback)
+    for key in ("HOME", "CLAUDE_PLUGIN_ROOT"):
+        del sandbox.env[key]
+    sandbox.env["PATH"] = SYSTEM_PATH
+    result = sandbox.run(f'bash "{PLUGIN}/scripts/hook.sh" stop', CODEX_PAYLOAD)
+    assert (result.returncode, result.stderr) == (0, b"")
+    assert sandbox.calls() == ["stub", "hook", "stop"]

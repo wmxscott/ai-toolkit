@@ -16,6 +16,7 @@ package.json                      Pi package: `pi.skills` lists each Pi/OpenCode
 plugins/<name>/
   .claude-plugin/plugin.json      Claude Code plugin manifest
   plugin.json                     Codex plugin manifest, only if the plugin supports Codex
+  .codex-plugin/plugin.json       Codex plugin manifest instead, for a plugin with hooks
   skills/<skill>/SKILL.md         skills, if any
   skills/<skill>/scripts/         files a skill runs, if it must work outside Claude Code
   hooks/hooks.json                hooks, if any (loaded automatically; don't list it in plugin.json)
@@ -42,23 +43,28 @@ pyproject.toml                    dev tooling only (pytest, ruff, shellcheck), m
 
 ## Codex support
 
-Add it only when the plugin works in Codex without its Claude-only parts. Skills carry over; Claude hooks don't.
+Add it only when the plugin works in Codex without its Claude-only parts. Skills carry over. Hooks can too: Codex reads `hooks/hooks.json` in Claude's format, sets `CLAUDE_PLUGIN_ROOT` for hook commands, names its shell tool `Bash` and sends a Claude-shaped payload. It runs a plugin's hooks only after the user trusts them in `/hooks`, so say so in the plugin's README.
 
-1. Write `plugins/<name>/plugin.json` in the [Agent Plugins](https://agent-plugins.org) format (`"$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json"`), which Codex prefers. Copy `name`, `description`, `author`, `homepage`, `repository`, `license` and `keywords` from the Claude manifest verbatim. Codex-only settings go under `extensions."com.openai"`, such as `interface` (`displayName`, `shortDescription`, `developerName: "wmxscott"`, `category`, `capabilities`, `websiteURL`). Don't add `.codex-plugin/plugin.json` as well: Codex reads the root manifest first, so a second one would only drift.
+1. Write the Codex manifest. Copy `name`, `description`, `author`, `homepage`, `repository`, `license` and `keywords` from the Claude manifest verbatim, and add `interface` (`displayName`, `shortDescription`, `developerName: "wmxscott"`, `category`, `capabilities`, `websiteURL`).
+   - Without hooks: `plugins/<name>/plugin.json` in the [Agent Plugins](https://agent-plugins.org) format (`"$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json"`), which Codex prefers, with `interface` under `extensions."com.openai"`.
+   - With hooks: `plugins/<name>/.codex-plugin/plugin.json`, Codex's own format, with `interface` at the top level. Codex (0.156.1) loads no hooks for an Agent Plugins manifest.
+   - Never both: Codex reads the root manifest first, so a second one would only drift.
 2. Add an entry to `.agents/plugins/marketplace.json`: `name`, `source: {"source": "local", "path": "./plugins/<name>"}`, `policy: {"installation": "AVAILABLE", "authentication": "ON_INSTALL"}`, `category`.
 3. Tick the Codex column in the `README.md` table.
 
-The two manifests don't collide. Claude Code reads only `.claude-plugin/`. Codex reads `.agents/plugins/marketplace.json` in preference to `.claude-plugin/marketplace.json`, and a plugin's root `plugin.json` in preference to `.claude-plugin/plugin.json`. So a Claude-only plugin stays out of Codex as long as it has no Codex marketplace entry.
+The two manifests don't collide. Claude Code reads only `.claude-plugin/`. Codex reads `.agents/plugins/marketplace.json` in preference to `.claude-plugin/marketplace.json`, and a plugin's root `plugin.json`, then `.codex-plugin/plugin.json`, in preference to `.claude-plugin/plugin.json`. So a Claude-only plugin stays out of Codex as long as it has no Codex marketplace entry.
 
-Leave `version` out of both manifests (the tests require them to agree). Codex then reports the plugin as `1.0.0`, but `codex plugin add` still recopies it on reinstall.
+Leave `version` out of both manifests (the tests require them to agree). Codex then reports the plugin as `1.0.0` (or `local` for a `.codex-plugin` manifest), but `codex plugin add` still recopies it on reinstall.
 
-`tests/test_codex.py` checks the Codex marketplace and manifests: schema, entry shape, agreement with the Claude manifest, and the README column.
+Codex ignores `disable-model-invocation`. To keep it from running a skill on its own, add `skills/<skill>/agents/openai.yaml` with `policy:` / `allow_implicit_invocation: false`; users still run it as `$<plugin>:<skill>`. Codex doesn't substitute `$ARGUMENTS` either, so a skill that reads it must say where the arguments are otherwise: the rest of the user's message.
+
+`tests/test_codex.py` checks the Codex marketplace and manifests: format, schema, entry shape, agreement with the Claude manifest, and the README column.
 
 ## Pi and OpenCode support
 
 Pi and OpenCode have no marketplace; from the plugins, both load plain [Agent Skills](https://agentskills.io/specification) and nothing else. So a plugin supports both or neither, and only when its skills work without Claude-only parts. Such a plugin must support Codex too.
 
-1. Add `./plugins/<name>/skills` to `pi.skills` in the root `package.json`. That list is the skills `pi install git:github.com/wmxscott/ai-toolkit` loads, and `.opencode/plugins/ai-toolkit.js` (the package's `main`, loaded through `"plugin": ["ai-toolkit@git+https://github.com/wmxscott/ai-toolkit.git"]`) reads the same list. The module's default export carries both OpenCode plugin shapes: `server`, whose config hook adds the directories to `skills.paths` (OpenCode 1, config key `plugin`), and `setup`, which adds each skill through `ctx.skill.transform` (OpenCode 2, config key `plugins`). OpenCode 1 calls `setup` as well, so it returns early without a skill domain. OpenCode 2 resolves a git or npm install through the package `main`, so keep it pointing at the module. Keep the package `private`, with no dependencies, and add no root `skills/`, `extensions/`, `prompts/` or `themes/`: Pi would load them from every install.
+1. Add `./plugins/<name>/skills` to `pi.skills` in the root `package.json`. That list is the skills `pi install git:github.com/wmxscott/ai-toolkit` loads, and `.opencode/plugins/ai-toolkit.js` (the package's `main`, loaded through `"plugin": ["ai-toolkit@git+https://github.com/wmxscott/ai-toolkit.git"]`) reads the same list. The module's default export carries both OpenCode plugin shapes: `server`, whose config hook adds the directories to `skills.paths` (OpenCode 1, config key `plugin`), and `setup`, which adds each skill through `ctx.skill.transform` (OpenCode 2, config key `plugins`). `setup` returns early when the context has no skill domain; OpenCode 1 doesn't call it. OpenCode 2 resolves a git or npm install through the package `main`, so keep it pointing at the module. Keep the package `private`, with no dependencies, and add no root `skills/`, `extensions/`, `prompts/` or `themes/`: Pi would load them from every install.
 2. Tick the Pi and OpenCode columns in the `README.md` table, and give the plugin's README an install section per agent.
 3. Make the skills portable:
    - Frontmatter is `name` (the directory name) and `description` (at most 1024 characters, strict YAML: no `: ` in a plain scalar, or a strict parser drops the skill).
@@ -93,7 +99,7 @@ scripts/validate.sh
 gitleaks dir . && gitleaks git .
 ```
 
-`scripts/validate.sh` runs `claude plugin validate` on the marketplace and on every plugin it lists. It fails on any error or warning, like `--strict`, except the missing-version warning (see "Adding a plugin"). It needs `jq` and the `claude` CLI, but no login. Codex has no validate command, so when `codex` is installed the script installs every Codex plugin into a throwaway `CODEX_HOME` and checks that Codex lists each skill; it never touches `~/.codex`. Tests that drive shell scripts build their environment from scratch and stub external tools on `PATH`, so they never touch the real terminal, multiplexer or `$HOME`.
+`scripts/validate.sh` runs `claude plugin validate` on the marketplace and on every plugin it lists. It fails on any error or warning, like `--strict`, except the missing-version warning (see "Adding a plugin"). It needs `jq` and the `claude` CLI, but no login. Codex has no validate command, so when `codex` is installed the script installs every Codex plugin into a throwaway `CODEX_HOME` and checks that Codex loads each skill and hook and lists each skill for the model, except one whose `agents/openai.yaml` forbids implicit use; it never touches `~/.codex`. Tests that drive shell scripts build their environment from scratch and stub external tools on `PATH`, so they never touch the real terminal, multiplexer or `$HOME`.
 
 ## Style
 

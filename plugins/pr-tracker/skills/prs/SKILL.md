@@ -3,16 +3,18 @@ name: prs
 description: List the pull requests tracked for this session, with their checks and reviews
 disable-model-invocation: true
 argument-hint: "[open|all]"
-allowed-tools: Bash(pr-tracker list *)
+allowed-tools: Bash(pr-tracker list *) Bash(printenv CLAUDE_CODE_SESSION_ID CODEX_SESSION_ID PI_SESSION_ID)
 ---
 
-Show the user the pull requests pr-tracker has for this session. Arguments: `$ARGUMENTS`
+Show the user the pull requests pr-tracker has for this session. Arguments: `$ARGUMENTS`. If your agent left that placeholder as it is, the arguments are whatever the user typed after the skill's name, if anything.
 
 Run:
 
 ```bash
-pr-tracker list --scope session --session "${CLAUDE_SESSION_ID}"
+pr-tracker list --scope session
 ```
+
+The CLI reads this session's id from the environment your agent gives its shell. If it says it has no session, the CLI is older than 1.1.0: tell the user to upgrade it (`brew upgrade pr-tracker`) and stop.
 
 If the arguments are `open` or `all`, run `pr-tracker list --scope open` or `pr-tracker list --scope all` instead, and say the list covers every session.
 
@@ -29,4 +31,10 @@ brew install wmxscott/tap/pr-tracker
 brew services start pr-tracker
 ```
 
-Finish with one line: for the interactive picker, run `prs --session ${CLAUDE_SESSION_ID}` in a terminal.
+Finish with the command that opens the interactive picker on this session. It can't run in your shell, so the user runs it in a terminal. Get the session id with:
+
+```bash
+printenv CLAUDE_CODE_SESSION_ID CODEX_SESSION_ID PI_SESSION_ID
+```
+
+It prints the one your agent sets, and exits 1 because the others are unset. End with one line: for the interactive picker, run `prs --session <id>` in a terminal, with that id in place of `<id>`.
