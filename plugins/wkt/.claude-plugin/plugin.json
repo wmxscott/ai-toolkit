@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "wkt",
+  "description": "Starts each piece of work in its own git worktree with wkt, opening a Herdr workspace only when one is wanted",
+  "author": {
+    "name": "wmxscott"
+  },
+  "homepage": "https://github.com/wmxscott/ai-toolkit/tree/main/plugins/wkt",
+  "repository": "https://github.com/wmxscott/ai-toolkit",
+  "license": "MIT",
+  "keywords": ["wkt", "git", "worktree", "herdr", "branch"]
+}

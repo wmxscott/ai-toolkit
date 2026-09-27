@@ -55,7 +55,7 @@ The Pi package and the OpenCode plugin bring in every ai-toolkit plugin that sup
 Optional:
 
 - [gh-stack](https://github.com/github/gh-stack) (`gh extension install github/gh-stack`) links each stack's PRs on GitHub and replants a child after its parent merges. Without it, the agent opens each PR against its parent branch and replants by hand.
-- [herdr-wkt](https://github.com/wmxscott/herdr-wkt) (`brew install wmxscott/tap/herdr-wkt`) provides `wkt`, which creates worktrees for Herdr. Without it, the agent uses `git worktree add`.
+- [wkt](https://github.com/wmxscott/wkt) (`brew install wmxscott/tap/wkt`) creates worktrees, and opens them in Herdr when run inside it. Without it, the agent uses `git worktree add`.
 
 ## The gates
 

@@ -61,9 +61,9 @@
       "category": "development"
     },
     {
-      "name": "herdr",
-      "source": "./plugins/herdr",
-      "description": "Starts each piece of work in its own git worktree, opened as its own Herdr workspace, with herdr-wkt",
+      "name": "wkt",
+      "source": "./plugins/wkt",
+      "description": "Starts each piece of work in its own git worktree with wkt, opening a Herdr workspace only when one is wanted",
       "category": "development"
     }
   ]

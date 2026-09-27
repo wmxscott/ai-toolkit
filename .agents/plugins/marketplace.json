@@ -41,10 +41,10 @@
       "category": "Developer Tools"
     },
     {
-      "name": "herdr",
+      "name": "wkt",
       "source": {
         "source": "local",
-        "path": "./plugins/herdr"
+        "path": "./plugins/wkt"
       },
       "policy": {
         "installation": "AVAILABLE",
