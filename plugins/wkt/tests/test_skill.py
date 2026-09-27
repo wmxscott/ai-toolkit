@@ -8,7 +8,7 @@ import pytest
 
 PLUGIN = Path(__file__).resolve().parent.parent
 ROOT = PLUGIN.parent.parent
-SKILL = (PLUGIN / "skills" / "herdr-worktrees" / "SKILL.md").read_text()
+SKILL = (PLUGIN / "skills" / "worktrees" / "SKILL.md").read_text()
 BLOCKS = re.findall(r"^```sh\n(.+?)\n```$", SKILL, re.M | re.S)
 [FALLBACK] = [block for block in BLOCKS if block.startswith("branch=<branch>\n")]
 GIT = shutil.which("git") or "/usr/bin/git"
@@ -50,7 +50,7 @@ def test_frontmatter_is_portable():
     assert frontmatter
     fields = dict(line.split(": ", 1) for line in frontmatter[1].splitlines())
     assert fields.keys() == {"name", "description"}
-    assert fields["name"] == "herdr-worktrees"
+    assert fields["name"] == "worktrees"
     description = fields["description"]
     assert description.startswith("Use when")
     assert len(description) <= 1024
@@ -74,6 +74,8 @@ def test_describes_wkt_1_0():
         "`.bare` layouts",
         "with `--no-track`",
         "`brew install wmxscott/tap/wkt`",
+        "Pass `--no-herdr` by default",
+        "open_in_herdr=\n",
     ):
         assert fact in SKILL, fact
     assert not re.search(r"\btabs?\b", SKILL, re.I), "Herdr calls them workspaces"
@@ -104,12 +106,12 @@ def test_codex_manifest_mirrors_claude_manifest():
 def test_listed_in_both_marketplaces():
     claude = json.loads((ROOT / ".claude-plugin" / "marketplace.json").read_text())
     codex = json.loads((ROOT / ".agents" / "plugins" / "marketplace.json").read_text())
-    assert {"name": "herdr", "source": "./plugins/herdr"}.items() <= next(
-        e for e in claude["plugins"] if e["name"] == "herdr"
+    assert {"name": "wkt", "source": "./plugins/wkt"}.items() <= next(
+        e for e in claude["plugins"] if e["name"] == "wkt"
     ).items()
-    assert next(e for e in codex["plugins"] if e["name"] == "herdr")["source"] == {
+    assert next(e for e in codex["plugins"] if e["name"] == "wkt")["source"] == {
         "source": "local",
-        "path": "./plugins/herdr",
+        "path": "./plugins/wkt",
     }
 
 
@@ -184,13 +186,17 @@ class Sandbox:
         self.git(top, "worktree", "add", "-q", "main", "main")
         return top
 
-    def run(self, shell: str, cwd: Path, branch: str = "feat/login", base: str = ""):
+    def run(
+        self, shell: str, cwd: Path, branch: str = "feat/login", base: str = "", herdr: bool = False
+    ):
         script = FALLBACK.replace("<branch>", branch).replace("base=\n", f"base={base}\n", 1)
+        if herdr:
+            script = script.replace("open_in_herdr=\n", "open_in_herdr=1\n", 1)
         args = [shell, "-f", "-c", script] if shell.endswith("zsh") else [shell, "-c", script]
         return subprocess.run(args, cwd=cwd, env=self.env, capture_output=True, text=True)
 
     def herdr_calls(self) -> list[str]:
-        return self.log.read_text().splitlines()
+        return self.log.read_text().splitlines() if self.log.exists() else []
 
 
 @pytest.fixture
@@ -198,7 +204,9 @@ def sandbox(tmp_path):
     return Sandbox(tmp_path)
 
 
-def assert_created(sandbox, result, repo_common: Path, worktree: Path, tip: str):
+def assert_created(
+    sandbox, result, repo_common: Path, worktree: Path, tip: str, opened: bool = False
+):
     assert result.returncode == 0, result.stderr
     assert worktree.is_dir()
     assert sandbox.git(worktree, "rev-parse", "HEAD") == tip
@@ -207,6 +215,9 @@ def assert_created(sandbox, result, repo_common: Path, worktree: Path, tip: str)
         ["git", "config", "--get", "branch.feat/login.merge"], cwd=worktree, env=sandbox.env
     )
     assert upstream.returncode == 1, "a new branch must not track its base"
+    if not opened:
+        assert sandbox.herdr_calls() == [], "herdr is opt-in"
+        return
     assert sandbox.herdr_calls() == [
         "worktree",
         "open",
@@ -242,17 +253,27 @@ def test_fallback_from_a_linked_worktree_still_opens_from_the_repository(sandbox
     work = sandbox.clone()
     other = sandbox.root / "other"
     sandbox.git(work, "worktree", "add", "-q", "-b", "other", str(other))
-    result = sandbox.run(shell, other)
+    result = sandbox.run(shell, other, herdr=True)
     worktree = sandbox.home / ".herdr" / "worktrees" / "acme" / "widget" / "feat" / "login"
-    assert_created(sandbox, result, work / ".git", worktree, sandbox.git(work, "rev-parse", "HEAD"))
+    tip = sandbox.git(work, "rev-parse", "HEAD")
+    assert_created(sandbox, result, work / ".git", worktree, tip, opened=True)
+
+
+@pytest.mark.parametrize("shell", SHELLS)
+def test_fallback_opens_herdr_only_when_asked(sandbox, shell):
+    work = sandbox.clone()
+    result = sandbox.run(shell, work, herdr=True)
+    worktree = sandbox.home / ".herdr" / "worktrees" / "acme" / "widget" / "feat" / "login"
+    tip = sandbox.git(work, "rev-parse", "HEAD")
+    assert_created(sandbox, result, work / ".git", worktree, tip, opened=True)
 
 
 @pytest.mark.parametrize("shell", SHELLS)
 def test_fallback_in_a_bare_layout_adds_a_sibling(sandbox, shell):
     top = sandbox.bare_layout()
     tip = sandbox.upstream_moves()
-    result = sandbox.run(shell, top / "main")
-    assert_created(sandbox, result, top / ".bare", top / "feat" / "login", tip)
+    result = sandbox.run(shell, top / "main", herdr=True)
+    assert_created(sandbox, result, top / ".bare", top / "feat" / "login", tip, opened=True)
 
 
 @pytest.mark.parametrize("shell", SHELLS)
