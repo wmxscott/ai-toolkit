@@ -1,4 +1,4 @@
-# stacked-planning
+# 🥞 stacked-planning
 
 > [!WARNING]
 > **Experimental.** The skills, the plan format and the gates' configuration may still change in ways that break existing plans and configs. Expect rough edges, and review what the agent plans and lands before relying on it.
