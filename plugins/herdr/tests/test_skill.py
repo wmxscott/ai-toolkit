@@ -57,26 +57,28 @@ def test_frontmatter_is_portable():
     assert ": " not in description and " #" not in description
 
 
-def test_command_surface_matches_herdr_wkt():
+def test_command_surface_matches_wkt():
     commands = [b for b in BLOCKS if b.startswith("wkt ")]
     assert commands == [
-        "wkt new -b <branch> [-s <source>] [-n <label>]",
-        "wkt rename -b <new-branch> [-n <label>] [-y]",
+        "wkt new -b <branch> [-s <source>] [-n <label>] [--no-herdr]",
+        "wkt rename -b <new-branch> [-n <label>] [-y] [--no-herdr]",
         "wkt setup <repo-url>",
+        "wkt adopt",
     ]
 
 
-def test_describes_herdr_wkt_1_0():
+def test_describes_wkt_1_0():
     for fact in (
-        "`$HERDR_WKT_ROOT/<org>/<repo>/<branch>`",
+        "`$WKT_ROOT/<org>/<repo>/<branch>`",
         "defaults to `~/.herdr/worktrees`",
         "`.bare` layouts",
         "with `--no-track`",
-        "`herdr-wkt`",
+        "`brew install wmxscott/tap/wkt`",
     ):
         assert fact in SKILL, fact
     assert not re.search(r"\btabs?\b", SKILL, re.I), "Herdr calls them workspaces"
     assert "DEV_DIR" not in SKILL
+    assert "herdr-wkt" not in SKILL and "HERDR_WKT_ROOT" not in SKILL
 
 
 def test_fallback_uses_real_herdr_flags():
@@ -227,8 +229,8 @@ def test_fallback_in_a_clone_uses_the_default_root(sandbox, shell):
 
 @pytest.mark.parametrize("shell", SHELLS)
 @pytest.mark.parametrize("setting", ["~/trees", "{home}/trees"])
-def test_fallback_honours_herdr_wkt_root(sandbox, shell, setting):
-    sandbox.env["HERDR_WKT_ROOT"] = setting.format(home=sandbox.home)
+def test_fallback_honours_wkt_root(sandbox, shell, setting):
+    sandbox.env["WKT_ROOT"] = setting.format(home=sandbox.home)
     work = sandbox.clone()
     result = sandbox.run(shell, work)
     worktree = sandbox.home / "trees" / "acme" / "widget" / "feat" / "login"

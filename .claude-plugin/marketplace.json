@@ -63,7 +63,7 @@
     {
       "name": "herdr",
       "source": "./plugins/herdr",
-      "description": "Starts each piece of work in its own git worktree, opened as its own Herdr workspace, with herdr-wkt",
+      "description": "Starts each piece of work in its own git worktree, opened as its own Herdr workspace, with wkt",
       "category": "development"
     }
   ]

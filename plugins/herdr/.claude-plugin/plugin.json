@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "herdr",
-  "description": "Starts each piece of work in its own git worktree, opened as its own Herdr workspace, with herdr-wkt",
+  "description": "Starts each piece of work in its own git worktree, opened as its own Herdr workspace, with wkt",
   "author": {
     "name": "wmxscott"
   },

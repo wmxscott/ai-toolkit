@@ -8,7 +8,7 @@ description: Use when starting work on a branch or worktree, when about to commi
 ## Never work directly on the default branch
 
 Every change goes on a branch, in its own worktree, unless the user says otherwise. Use
-`wkt new -b <branch>` when `wkt` ([herdr-wkt](https://github.com/wmxscott/herdr-wkt)) is on
+`wkt new -b <branch>` when [`wkt`](https://github.com/wmxscott/wkt) is on
 `PATH`; otherwise plain git does the same job:
 
 ```sh
