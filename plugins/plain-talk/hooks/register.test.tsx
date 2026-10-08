@@ -9,7 +9,7 @@ test('colors the Needs you header and keeps the text around it', async $ => {
     const ui = await $.ui.mount({ plugin: 'plain-talk', surface, component: 'AssistantMessage', props: props(text) })
 
     const header = await ui.find({ type: 'Text', text: /Needs you/ })
-    expect(header).toBeDefined()
+    expect(header?.props.color).toBe(surface === 'terminal' ? 'ansi256(13)' : '#ff69b4')
     expect(await ui.findAll({ type: 'Markdown' })).toHaveLength(2)
     await ui.unmount()
   }

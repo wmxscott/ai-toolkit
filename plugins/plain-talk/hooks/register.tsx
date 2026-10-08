@@ -1,6 +1,9 @@
 import type { Register } from 'claude-code'
 
-const COLOR = '#ff69b4'
+// Palette slot 13 (bright magenta) is the terminal theme's own colour; Claude Code's ANSI themes use it for pink.
+// A name such as 'magentaBright' is drawn as a fixed colour instead, and the `ansi:` form is refused.
+// Other surfaces have no terminal palette.
+const color = (surface: string) => (surface === 'terminal' ? 'ansi256(13)' : '#ff69b4')
 
 const RULES = `# How to talk to the user
 
@@ -75,7 +78,7 @@ export const register: Register = on => {
       <Box flexDirection="column">
         {parts.before && <Markdown text={parts.before} />}
         <Box marginTop={parts.before ? 1 : 0}>
-          <Text color={COLOR} bold>
+          <Text color={color(e.surface)} bold>
             {'\uf11e Needs you'}
           </Text>
         </Box>
