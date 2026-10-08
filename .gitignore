@@ -5,3 +5,7 @@ __pycache__/
 /.ruff_cache/
 node_modules/
 .DS_Store
+
+# Written by `claude plugin test` for editor type-checking.
+/plugins/*/tsconfig.json
+/plugins/*/.claude-plugin/types/

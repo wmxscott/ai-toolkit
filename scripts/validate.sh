@@ -1,7 +1,8 @@
 #!/bin/bash
 # Validate the marketplace and each plugin it lists, treating warnings as
 # errors like --strict, except "No version specified": plugins deliberately
-# omit version so installs track the marketplace's commit SHA.
+# omit version so installs track the marketplace's commit SHA. A plugin with
+# hooks module tests (*.test.tsx) also runs them with `claude plugin test`.
 #
 # When codex is installed, also install every Codex plugin into a throwaway
 # CODEX_HOME and check Codex loads each of its skills and hooks, and lists
@@ -26,6 +27,17 @@ validate() {
         status=1
     else
         echo "ok: $1"
+    fi
+}
+
+test_modules() {
+    local report
+    [ -n "$(find "$1" -name '*.test.tsx' -print -quit)" ] || return 0
+    if report=$(claude plugin test "$1" 2>&1); then
+        echo "ok: $1 module tests"
+    else
+        printf '%s\n' "$report" >&2
+        status=1
     fi
 }
 
@@ -113,6 +125,7 @@ validate_codex() {
 validate .
 while IFS= read -r source; do
     validate "$source"
+    test_modules "$source"
 done < <(jq -r '.plugins[] | select(.source | type == "string") | .source' .claude-plugin/marketplace.json)
 
 if command -v codex >/dev/null 2>&1; then

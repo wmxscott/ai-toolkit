@@ -1,0 +1,9 @@
+{
+  "name": "plain-talk",
+  "description": "Short, plain-language replies that flag what needs you in a pink header, plus an /overview recap command",
+  "author": { "name": "wmxscott" },
+  "homepage": "https://github.com/wmxscott/ai-toolkit/tree/main/plugins/plain-talk",
+  "repository": "https://github.com/wmxscott/ai-toolkit",
+  "license": "MIT",
+  "keywords": ["output", "communication", "brevity", "summary"]
+}

@@ -20,6 +20,7 @@ plugins/<name>/
   skills/<skill>/SKILL.md         skills, if any
   skills/<skill>/scripts/         files a skill runs, if it must work outside Claude Code
   hooks/hooks.json                hooks, if any (loaded automatically; don't list it in plugin.json)
+  hooks/*.tsx                     a mod's hooks module and its *.test.tsx tests, if any
   scripts/                        scripts used by hooks and skills
   README.md                       user-facing docs
   tests/                          pytest tests for this plugin
@@ -101,7 +102,7 @@ scripts/validate.sh
 gitleaks dir . && gitleaks git .
 ```
 
-`scripts/validate.sh` runs `claude plugin validate` on the marketplace and on every plugin it lists. It fails on any error or warning, like `--strict`, except the missing-version warning (see "Adding a plugin"). It needs `jq` and the `claude` CLI, but no login. Codex has no validate command, so when `codex` is installed the script installs every Codex plugin into a throwaway `CODEX_HOME` and checks that Codex loads each skill and hook and lists each skill for the model, except one whose `agents/openai.yaml` forbids implicit use; it never touches `~/.codex`. Tests that drive shell scripts build their environment from scratch and stub external tools on `PATH`, so they never touch the real terminal, multiplexer or `$HOME`.
+`scripts/validate.sh` runs `claude plugin validate` on the marketplace and on every plugin it lists. It fails on any error or warning, like `--strict`, except the missing-version warning (see "Adding a plugin"). It also runs `claude plugin test` on every plugin with `*.test.tsx` files (a mod: a plugin whose `hooks.json` lists TypeScript `modules`; see the `plugin-authoring` skill). It needs `jq` and the `claude` CLI, but no login. Codex has no validate command, so when `codex` is installed the script installs every Codex plugin into a throwaway `CODEX_HOME` and checks that Codex loads each skill and hook and lists each skill for the model, except one whose `agents/openai.yaml` forbids implicit use; it never touches `~/.codex`. Tests that drive shell scripts build their environment from scratch and stub external tools on `PATH`, so they never touch the real terminal, multiplexer or `$HOME`.
 
 ## Style
 
