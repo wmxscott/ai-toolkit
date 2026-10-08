@@ -37,6 +37,12 @@
       "category": "productivity"
     },
     {
+      "name": "plain-talk",
+      "source": "./plugins/plain-talk",
+      "description": "Short, plain-language replies that flag what needs you in a pink header, plus an /overview recap command",
+      "category": "productivity"
+    },
+    {
       "name": "security-key-git-signing",
       "source": "./plugins/security-key-git-signing",
       "description": "Checks a hardware security key is plugged in before git signs a commit or tag with GPG, and asks for it if not",
