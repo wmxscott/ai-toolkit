@@ -1,15 +1,21 @@
 #!/usr/bin/env bash
-# Makes the current repository commit, push and open pull requests as the GitHub App
-# that gh-app-auth has configured for it.
+# Sets up `git app`, a git alias that runs one git command as the GitHub App that
+# gh-app-auth has configured for this repository. Plain git is left alone.
 #
-#   setup [--coauthor "Name <email>"]   act as the app in this repository
+#   setup [--coauthor "Name <email>"]   add the alias and record the app's identity
 #   status                              check the setup and mint a fresh token
 #   rekey <private-key.pem>             store a new private key for the app
-#   off                                 go back to your own identity
+#   off                                 remove the alias and the recorded identity
 set -euo pipefail
 
 SECTION=gh-app-auth
-HELPER='!gh app-auth git-credential'
+
+# Runs from the directory git was called in, reads the identity at call time, credits
+# the co-author on `commit`, and passes everything else to git as `-c` options:
+# the bot as author and committer, no signing, gh-app-auth as the only credential
+# helper for the owner, and HTTPS in place of SSH (insteadOf also rewrites a pushurl).
+# shellcheck disable=SC2016
+ALIAS='!f() { cd "${GIT_PREFIX:-.}" || return 1; login=$(git config --get gh-app-auth.login) && id=$(git config --get gh-app-auth.userid) && coauthor=$(git config --get gh-app-auth.coauthor) && repo=$(git config --get gh-app-auth.repo) || { echo "git app: not set up; run gh-app-identity.sh setup" >&2; return 1; }; host=${repo%%/*}; owner=${repo#*/}; owner=${owner%%/*}; if [ "$1" = commit ]; then shift; set -- commit --trailer "Co-authored-by: $coauthor" "$@"; fi; git -c user.name="$login" -c user.email="$id+$login@users.noreply.github.com" -c commit.gpgsign=false -c trailer.ifexists=addIfDifferent -c "credential.https://$host/$owner.helper=" -c "credential.https://$host/$owner.helper=!gh app-auth git-credential" -c "credential.https://$host.useHttpPath=true" -c "url.https://$host/.insteadOf=git@$host:" -c "url.https://$host/.insteadOf=ssh://git@$host/" "$@"; }; f'
 
 die() {
 	printf 'gh-app-identity: %s\n' "$*" >&2
@@ -17,12 +23,12 @@ die() {
 }
 
 usage() {
-	sed -n '4,7s/^#   //p' "$0" >&2
+	sed -n '5,8s/^#   //p' "$0" >&2
 	exit 64
 }
 
 need() {
-	command -v "$1" >/dev/null 2>&1 || die "$1 is not installed${2:+ ($2)}"
+	command -v "$1" >/dev/null 2>&1 || die "$1 is not installed"
 }
 
 in_repo() {
@@ -59,10 +65,6 @@ parse_remote() {
 		die "can't read owner and repository from origin URL $url"
 	fi
 	TARGET=$HOST/$OWNER/$NAME
-}
-
-helper_key() {
-	printf 'credential.https://%s/%s.helper' "$HOST" "$OWNER"
 }
 
 # Prints "<login> <user id>" of whoever the app's installation token acts as.
@@ -109,45 +111,21 @@ cmd_setup() {
 		local name email
 		name=$(git config --get user.name || true)
 		email=$(git config --get user.email || true)
-		if [[ -n $name && -n $email && $name != "$login" ]]; then
-			coauthor="$name <$email>"
-		fi
+		[[ -z $name || -z $email ]] || coauthor="$name <$email>"
 	fi
 	[[ -n $coauthor ]] || die "no git identity to credit; pass --coauthor \"Name <email>\""
 	valid_coauthor "$coauthor" || die "--coauthor must look like \"Name <email>\", got: $coauthor"
 
-	local key
-	key=$(helper_key)
-	git config --local user.name "$login"
-	git config --local user.email "$id+$login@users.noreply.github.com"
-	git config --local commit.gpgsign false
-	# The empty value drops the helpers inherited from system and global config, so no
-	# saved credential or stale app token is tried before gh-app-auth mints a fresh one.
-	git config --local --replace-all "$key" ''
-	git config --local --add "$key" "$HELPER"
-	git config --local "credential.https://$HOST.useHttpPath" true
 	git config --local "$SECTION.login" "$login"
 	git config --local "$SECTION.userid" "$id"
 	git config --local "$SECTION.coauthor" "$coauthor"
 	git config --local "$SECTION.repo" "$TARGET"
+	git config --local alias.app "$ALIAS"
 
-	printf 'This repository now acts as %s.\n' "$login"
+	printf '"git app <command>" now runs git as %s in this repository.\n' "$login"
 	printf '  author     %s <%s+%s@users.noreply.github.com>\n' "$login" "$id" "$login"
 	printf '  co-author  %s\n' "$coauthor"
-	printf '  signing    off\n'
-	warn_push_url
-}
-
-warn_push_url() {
-	local push
-	push=$(git remote get-url --push origin)
-	case $push in
-	https://*) ;;
-	*)
-		printf 'warning: origin pushes over %s, as you rather than the app. To push as the app:\n' "$push"
-		printf '  git remote set-url --push origin https://%s.git\n' "$TARGET"
-		;;
-	esac
+	printf 'Plain git still runs as %s.\n' "$(git config --get user.name || echo you)"
 }
 
 cmd_status() {
@@ -156,36 +134,26 @@ cmd_status() {
 	local login
 	login=$(git config --local --get "$SECTION.login" || true)
 	if [[ -z $login ]]; then
-		printf 'Not set up: this repository commits as %s.\n' "$(git config --get user.name || echo nobody)"
+		printf 'Not set up: this repository has no "git app".\n'
 		exit 2
 	fi
 	need gh
 	parse_remote
 
-	local problems=0 id email key helpers identity
-	id=$(git config --local --get "$SECTION.userid")
-	email="$id+$login@users.noreply.github.com"
-	key=$(helper_key)
-
+	local problems=0 identity var
 	problem() {
 		printf 'problem: %s\n' "$*"
 		problems=$((problems + 1))
 	}
 
-	[[ $(git config --get user.name) == "$login" ]] ||
-		problem "user.name is '$(git config --get user.name)', not $login"
-	[[ $(git config --get user.email) == "$email" ]] ||
-		problem "user.email is '$(git config --get user.email)', not $email"
-	[[ $(git config --type=bool --get commit.gpgsign || echo false) == false ]] ||
-		problem "commit.gpgsign is on; bot commits would show as Unverified"
-	helpers=$(git config --local --get-all "$key" || true)
-	[[ $helpers == $'\n'"$HELPER" ]] ||
-		problem "credential helpers for https://$HOST/$OWNER are not reset to gh-app-auth alone"
-	[[ $(git config --local --type=bool --get "credential.https://$HOST.useHttpPath" || true) == true ]] ||
-		problem "credential.https://$HOST.useHttpPath is not on"
+	[[ $(git config --local --get alias.app || true) == "$ALIAS" ]] ||
+		problem "the git app alias is missing or changed"
+	[[ $(git config --local --get "$SECTION.repo" || true) == "$TARGET" ]] ||
+		problem "$SECTION.repo is not $TARGET"
+	[[ $(git config --local --get "$SECTION.userid" || true) =~ ^[0-9]+$ ]] ||
+		problem "no bot user ID recorded"
 	[[ -n $(git config --local --get "$SECTION.coauthor" || true) ]] ||
 		problem "no co-author recorded"
-	local var
 	for var in GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL; do
 		[[ -z ${!var:-} ]] || problem "$var is set in the environment and overrides the app identity"
 	done
@@ -200,7 +168,6 @@ cmd_status() {
 		problem "could not mint a token for $TARGET: $identity"
 		printf '  diagnose with: gh app-auth test --repo %s --verbose\n' "$TARGET"
 	fi
-	warn_push_url
 
 	if ((problems)); then
 		exit 1
@@ -247,19 +214,11 @@ cmd_rekey() {
 cmd_off() {
 	(($# == 0)) || usage
 	in_repo
-	local login key
-	login=$(git config --local --get "$SECTION.login" || true)
-	[[ -n $login ]] || die "this repository is not set up to act as a GitHub App"
-	parse_remote
-	key=$(helper_key)
-	[[ $(git config --local --get user.name || true) != "$login" ]] || git config --local --unset user.name
-	[[ $(git config --local --get user.email || true) != *"+$login@users.noreply.github.com" ]] ||
-		git config --local --unset user.email
-	git config --local --unset commit.gpgsign || true
-	git config --local --unset-all "$key" || true
-	git config --local --unset "credential.https://$HOST.useHttpPath" || true
+	[[ -n $(git config --local --get "$SECTION.login" || true) ]] ||
+		die "this repository has no git app to remove"
+	git config --local --unset alias.app || true
 	git config --local --remove-section "$SECTION"
-	printf 'This repository commits as %s again.\n' "$(git config --get user.name || echo nobody)"
+	printf 'Removed "git app" from this repository.\n'
 }
 
 (($#)) || usage

@@ -2,14 +2,13 @@
 
 Lets an AI agent commit, push and open pull requests as a GitHub App's bot (`<app>[bot]`) instead of as you, one app per GitHub account or org, through the [gh-app-auth](https://github.com/AmadeusITGroup/gh-app-auth) `gh` extension. You stay on every commit as co-author.
 
-It works per repository. In a repository you set up, the agent:
+It works per repository, and only for the agent. In a repository you set up, the agent:
 
-- commits as `<app>[bot] <id+app[bot]@users.noreply.github.com>`, with a `Co-authored-by:` trailer naming you;
-- pushes with a fresh app token on every push;
+- commits and pushes through `git app`, a git alias that makes `<app>[bot] <id+app[bot]@users.noreply.github.com>` the author, adds a `Co-authored-by:` trailer naming you, and logs in with a fresh app token on every push;
 - runs `gh pr create` and other writing `gh` commands through `gh app-auth exec`, so the PR is the app's;
 - checks the setup and mints a new token when auth fails, and stores a new private key when the app needs reauthorizing.
 
-Other repositories are untouched.
+Your own `git commit`, `git push` and `gh` commands are untouched: same name, same signing key, same login. Other repositories are untouched too.
 
 ## Install
 
@@ -54,29 +53,32 @@ The Pi package and the OpenCode plugin bring in every ai-toolkit plugin that sup
 Once the app is set up with `gh app-auth setup`, ask the agent to set up a repository to act as the app, or run it yourself:
 
 ```sh
-bash skills/gh-app-auth/scripts/gh-app-identity.sh setup     # act as the app here
+bash skills/gh-app-auth/scripts/gh-app-identity.sh setup     # add git app here
 bash skills/gh-app-auth/scripts/gh-app-identity.sh status    # check, and mint a fresh token
 bash skills/gh-app-auth/scripts/gh-app-identity.sh rekey ~/Downloads/app.private-key.pem
-bash skills/gh-app-auth/scripts/gh-app-identity.sh off       # back to your own identity
+bash skills/gh-app-auth/scripts/gh-app-identity.sh off       # remove git app
 ```
 
-`setup` writes only to the repository's `.git/config`:
+`setup` adds only these to the repository's `.git/config`:
 
 | Setting | Value |
 |---|---|
-| `user.name`, `user.email` | The bot's login, and `<id>+<login>@users.noreply.github.com` |
-| `commit.gpgsign` | `false` |
-| `credential.https://<host>/<owner>.helper` | An empty value, then `!gh app-auth git-credential` |
-| `credential.https://<host>.useHttpPath` | `true` |
-| `gh-app-auth.login`, `.userid`, `.coauthor`, `.repo` | What the agent reads |
+| `alias.app` | The `git app` alias |
+| `gh-app-auth.login`, `gh-app-auth.userid` | The bot's login and user ID, looked up through the app |
+| `gh-app-auth.coauthor` | Your git identity at setup time, or `--coauthor "Name <email>"` |
+| `gh-app-auth.repo` | `<host>/<owner>/<repo>`, from `origin` |
 
-The co-author is your git identity at setup time; pass `--coauthor "Name <email>"` to choose another.
+Nothing else changes, so plain `git` behaves as before. `git app <command>` runs `git <command>` with these options for that one command:
 
-Signing is off because GitHub can't verify a bot's commit signed with your personal key: it would show as Unverified. Bot commits show no badge instead. A branch rule that requires signed commits will reject them.
+| Option | Why |
+|---|---|
+| `user.name`, `user.email` | The bot as author and committer |
+| `commit.gpgsign=false` | GitHub can't verify a bot's commit signed with your personal key: it would show as Unverified. Bot commits show no badge instead, and a branch rule that requires signed commits will reject them |
+| `--trailer "Co-authored-by: ..."`, on `commit` only | Credits you; `trailer.ifexists=addIfDifferent` keeps it to one |
+| An empty `credential.https://<host>/<owner>.helper`, then `!gh app-auth git-credential` | Clears the helpers your system and global config add, such as the macOS Keychain or `credential.helper store`, so git can't push as you or replay an expired app token |
+| `url.https://<host>/.insteadOf` for `git@<host>:` and `ssh://git@<host>/` | SSH would bypass the app. `insteadOf` rewrites a `pushurl` too; `pushInsteadOf` doesn't |
 
-The empty helper value clears the helpers your system and global git config add, such as the macOS Keychain or `credential.helper store`. Without it, git tries those first: it may push as you, or save the app's one-hour token and send it back after it has expired.
-
-Pushes over SSH bypass the app and go out as you. `setup` and `status` warn when `origin` pushes over SSH, and print the command that switches it to HTTPS.
+Run `git config alias.app` to read the alias itself.
 
 ## Sharing an app
 

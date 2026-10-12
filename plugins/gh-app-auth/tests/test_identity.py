@@ -1,5 +1,6 @@
-"""Drives scripts/gh-app-identity.sh in scratch repositories, with a stub gh on PATH and a
-git config built from scratch, so no real extension, keyring or $HOME is ever reached."""
+"""Drives scripts/gh-app-identity.sh and the `git app` alias it adds in scratch repositories,
+with a stub gh on PATH and a git config built from scratch, so no real extension, keyring or
+$HOME is ever reached."""
 
 import json
 import re
@@ -17,7 +18,7 @@ JQ = shutil.which("jq")
 TARGET = "github.com/acme/widget"
 BOT = "acme-agent[bot]"
 BOT_EMAIL = f"4242+{BOT}@users.noreply.github.com"
-HELPER = "!gh app-auth git-credential"
+COAUTHOR = "Co-authored-by: Ada Lovelace <ada@example.com>"
 
 STUB = r"""#!/bin/bash
 printf '%s\n' "$*" >> "$STUB_DIR/calls"
@@ -83,10 +84,15 @@ class Sandbox:
     def config(self, key: str) -> str:
         return self.git("config", "--get", key, check=False)
 
-    def helpers(self) -> list[str]:
-        key = "credential.https://github.com/acme.helper"
-        listed = self.git("config", "--local", "--null", "--get-all", key, check=False)
-        return listed.split("\0")[:-1] if listed else []
+    def run(self, *args: str, cwd: Path | None = None, **kwargs) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            ["git", *args],
+            cwd=cwd or self.repo,
+            env={**self.env, "GIT_TERMINAL_PROMPT": "0"},
+            capture_output=True,
+            text=True,
+            **kwargs,
+        )
 
     def script(self, *args: str, **env: str) -> subprocess.CompletedProcess:
         return subprocess.run(
@@ -101,17 +107,14 @@ class Sandbox:
         calls = self.root / "calls"
         return calls.read_text().splitlines() if calls.exists() else []
 
-    def password(self) -> str:
-        filled = subprocess.run(
-            ["git", "credential", "fill"],
-            cwd=self.repo,
-            env={**self.env, "GIT_TERMINAL_PROMPT": "0"},
-            input=f"url=https://{TARGET}.git\n\n",
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout
-        return re.search(r"^password=(.*)$", filled, re.M)[1]
+    def password(self, *git: str) -> str:
+        filled = self.run(*git, "credential", "fill", input=f"url=https://{TARGET}.git\n\n")
+        assert filled.returncode == 0, filled.stderr
+        return re.search(r"^password=(.*)$", filled.stdout, re.M)[1]
+
+    def local_keys(self) -> set[str]:
+        listed = self.git("config", "--local", "--name-only", "--list").splitlines()
+        return {key for key in listed if not key.startswith(("core.", "remote."))}
 
 
 @pytest.fixture
@@ -157,16 +160,18 @@ def test_setup_reads_the_repository_from_any_remote_form(tmp_path, remote):
     assert box.config("gh-app-auth.repo") == TARGET
 
 
-def test_setup_makes_the_repository_act_as_the_app(box):
-    result = set_up(box)
-    assert box.config("user.name") == BOT
-    assert box.config("user.email") == BOT_EMAIL
-    assert box.config("commit.gpgsign") == "false"
+def test_setup_adds_only_the_alias_and_the_identity(box):
+    set_up(box)
+    assert box.local_keys() == {
+        "alias.app",
+        "gh-app-auth.login",
+        "gh-app-auth.userid",
+        "gh-app-auth.coauthor",
+        "gh-app-auth.repo",
+    }
     assert box.config("gh-app-auth.login") == BOT
     assert box.config("gh-app-auth.userid") == "4242"
     assert box.config("gh-app-auth.coauthor") == "Ada Lovelace <ada@example.com>"
-    assert box.helpers() == ["", HELPER]
-    assert "warning" not in result.stdout
 
 
 def test_setup_leaves_global_config_alone(box):
@@ -175,26 +180,70 @@ def test_setup_leaves_global_config_alone(box):
     assert (box.home / ".gitconfig").read_text() == before
 
 
-def test_only_gh_app_auth_answers_for_the_repository(box):
+def test_plain_git_is_still_the_user(box):
+    set_up(box)
+    assert box.git("var", "GIT_AUTHOR_IDENT").startswith("Ada Lovelace <ada@example.com>")
     assert box.password() == "personal-token"
-    set_up(box)
-    assert box.password() == "app-token"
+    (box.repo / "notes.txt").write_text("mine\n")
+    box.git("add", "notes.txt")
+    signed = box.run("commit", "-m", "Mine")
+    assert signed.returncode != 0
+    assert "gpg" in signed.stderr
 
 
-def test_the_skill_commit_is_unsigned_by_the_bot_with_a_coauthor(box):
+def test_git_app_logs_in_with_gh_app_auth_only(box):
     set_up(box)
-    command = re.search(r"^  (git commit .+)$", SKILL, re.M)[1].replace(
-        "<message>", "Fix login bug"
-    )
-    (box.repo / "login.txt").write_text("fixed\n")
-    box.git("add", "login.txt")
-    commit = subprocess.run(
-        ["bash", "-c", command], cwd=box.repo, env=box.env, capture_output=True, text=True
-    )
-    assert commit.returncode == 0, commit.stderr
+    assert box.password("app") == "app-token"
+
+
+def test_git_app_commits_as_the_bot_from_a_subdirectory(box):
+    set_up(box)
+    sub = box.repo / "src"
+    sub.mkdir()
+    (sub / "login.txt").write_text("fixed\n")
+    for args in (["add", "login.txt"], ["commit", "-m", "Fix login bug"]):
+        result = box.run("app", *args, cwd=sub)
+        assert result.returncode == 0, result.stderr
     assert box.git("log", "-1", "--format=%an <%ae>|%cn|%G?") == f"{BOT} <{BOT_EMAIL}>|{BOT}|N"
-    message = box.git("log", "-1", "--format=%B")
-    assert message == "Fix login bug\n\nCo-authored-by: Ada Lovelace <ada@example.com>"
+    assert box.git("log", "-1", "--format=%B") == f"Fix login bug\n\n{COAUTHOR}"
+
+
+def test_git_app_credits_the_coauthor_once(box):
+    set_up(box)
+    (box.repo / "a.txt").write_text("a\n")
+    box.git("add", "a.txt")
+    message = f"Add a\n\n{COAUTHOR}"
+    for args in (["commit", "-m", message], ["commit", "--amend", "--no-edit"]):
+        result = box.run("app", *args)
+        assert result.returncode == 0, result.stderr
+    assert box.git("log", "-1", "--format=%B") == message
+
+
+@pytest.mark.parametrize(
+    ("url", "pushurl"),
+    [
+        ("git@github.com:acme/widget.git", None),
+        (f"https://{TARGET}.git", "git@github.com:acme/widget.git"),
+        (f"https://{TARGET}.git", "ssh://git@github.com/acme/widget.git"),
+    ],
+)
+def test_git_app_pushes_over_https(tmp_path, url, pushurl):
+    box = Sandbox(tmp_path, url)
+    if pushurl:
+        box.git("remote", "set-url", "--push", "origin", pushurl)
+    set_up(box)
+    pushed = box.run("app", "remote", "get-url", "--push", "origin")
+    assert pushed.stdout.strip() == f"https://{TARGET}.git"
+    assert box.git("remote", "get-url", "--push", "origin") == (pushurl or url)
+
+
+def test_git_app_refuses_without_the_identity(box):
+    set_up(box)
+    box.git("config", "--local", "--remove-section", "gh-app-auth")
+    result = box.run("app", "commit", "--allow-empty", "-m", "x")
+    assert result.returncode != 0
+    assert "not set up" in result.stderr
+    assert box.git("rev-list", "--all") == ""
 
 
 def test_setup_takes_an_explicit_coauthor(box):
@@ -203,36 +252,30 @@ def test_setup_takes_an_explicit_coauthor(box):
 
 
 def test_rerunning_setup_keeps_the_coauthor(box):
+    set_up(box, "--coauthor", "Grace Hopper <grace@example.com>")
     set_up(box)
-    set_up(box)
-    assert box.config("gh-app-auth.coauthor") == "Ada Lovelace <ada@example.com>"
-    assert box.helpers() == ["", HELPER]
+    assert box.config("gh-app-auth.coauthor") == "Grace Hopper <grace@example.com>"
+    assert len(box.git("config", "--local", "--get-all", "alias.app").splitlines()) == 1
 
 
 def test_setup_rejects_a_malformed_coauthor(box):
     result = box.script("setup", "--coauthor", "ada@example.com")
     assert result.returncode == 1
     assert "Name <email>" in result.stderr
-    assert box.config("user.name") == "Ada Lovelace"
+    assert box.local_keys() == set()
 
 
 def test_setup_refuses_a_credential_that_is_not_an_app(box):
     result = box.script("setup", STUB_IDENTITY="ada 1")
     assert result.returncode == 1
     assert "not as a GitHub App" in result.stderr
-    assert box.config("user.name") == "Ada Lovelace"
+    assert box.local_keys() == set()
 
 
 def test_setup_points_at_the_extension_when_no_app_works(box):
     result = box.script("setup", STUB_EXEC_ERROR="no GitHub App configured")
     assert result.returncode == 1
     assert f"gh app-auth test --repo {TARGET}" in result.stderr
-
-
-def test_setup_warns_when_pushes_go_over_ssh(box):
-    box.git("remote", "set-url", "--push", "origin", "git@github.com:acme/widget.git")
-    result = set_up(box)
-    assert f"git remote set-url --push origin https://{TARGET}.git" in result.stdout
 
 
 def test_status_without_setup(box):
@@ -252,8 +295,8 @@ def test_status_mints_a_token_and_passes(box):
 @pytest.mark.parametrize(
     ("change", "env", "problem"),
     [
-        (("user.email", "ada@example.com"), {}, "user.email is"),
-        (("commit.gpgsign", "true"), {}, "commit.gpgsign is on"),
+        (("alias.app", "!git"), {}, "alias is missing or changed"),
+        (("gh-app-auth.repo", "github.com/acme/other"), {}, "gh-app-auth.repo is not"),
         (None, {"GIT_AUTHOR_NAME": "Ada"}, "GIT_AUTHOR_NAME is set"),
         (None, {"STUB_EXEC_ERROR": "failed to generate JWT"}, "failed to generate JWT"),
         (None, {"STUB_IDENTITY": "other[bot] 7"}, "acts as 'other[bot]'"),
@@ -266,14 +309,6 @@ def test_status_reports_problems(box, change, env, problem):
     result = box.script("status", **env)
     assert result.returncode == 1
     assert problem in result.stdout
-
-
-def test_status_catches_a_helper_list_that_lets_others_in(box):
-    set_up(box)
-    box.git("config", "--local", "--unset-all", "credential.https://github.com/acme.helper", "^$")
-    result = box.script("status")
-    assert result.returncode == 1
-    assert "not reset to gh-app-auth alone" in result.stdout
 
 
 def test_status_warns_about_an_exported_token(box):
@@ -320,13 +355,9 @@ def test_rekey_refuses_a_file_that_is_not_a_key(box):
     assert not (box.root / "setup").exists()
 
 
-def test_off_restores_the_users_identity_and_helpers(box):
+def test_off_removes_the_alias_and_the_identity(box):
     set_up(box)
     result = box.script("off")
     assert result.returncode == 0, result.stderr
-    assert "Ada Lovelace again" in result.stdout
-    assert box.config("user.name") == "Ada Lovelace"
-    assert box.config("commit.gpgsign") == "true"
-    assert box.config("gh-app-auth.login") == ""
-    assert box.helpers() == []
-    assert box.password() == "personal-token"
+    assert box.local_keys() == set()
+    assert box.run("app", "status").returncode != 0
