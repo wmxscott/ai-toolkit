@@ -1,0 +1,24 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "gh-app-auth",
+  "description": "Commits, pushes and opens pull requests as a per-org GitHub App bot through gh-app-auth, with the user as co-author",
+  "author": {
+    "name": "wmxscott"
+  },
+  "homepage": "https://github.com/wmxscott/ai-toolkit/tree/main/plugins/gh-app-auth",
+  "repository": "https://github.com/wmxscott/ai-toolkit",
+  "license": "MIT",
+  "keywords": ["github", "github-app", "gh", "git", "identity", "pull-request", "bot"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "GitHub App Identity",
+        "shortDescription": "Commit, push and open PRs as a GitHub App bot",
+        "developerName": "wmxscott",
+        "category": "Developer Tools",
+        "capabilities": ["Read", "Write"],
+        "websiteURL": "https://github.com/wmxscott/ai-toolkit/tree/main/plugins/gh-app-auth"
+      }
+    }
+  }
+}

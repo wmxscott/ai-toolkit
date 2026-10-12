@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "gh-app-auth",
+  "description": "Commits, pushes and opens pull requests as a per-org GitHub App bot through gh-app-auth, with the user as co-author",
+  "author": {
+    "name": "wmxscott"
+  },
+  "homepage": "https://github.com/wmxscott/ai-toolkit/tree/main/plugins/gh-app-auth",
+  "repository": "https://github.com/wmxscott/ai-toolkit",
+  "license": "MIT",
+  "keywords": ["github", "github-app", "gh", "git", "identity", "pull-request", "bot"]
+}

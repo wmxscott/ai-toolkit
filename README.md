@@ -21,6 +21,7 @@ The repository is a Claude Code plugin marketplace, a Codex one, and a Pi and Op
 | [theme-sync](plugins/theme-sync) | Switches Claude Code between its light and dark themes the moment the macOS appearance changes | ✓ | | | |
 | [pr-tracker](plugins/pr-tracker) | Tracks the pull requests a session opens and tells it when their checks or reviews change, through the [pr-tracker](https://github.com/wmxscott/pr-tracker) CLI | ✓ | ✓ | ✓ | |
 | [wkt](plugins/wkt) | Starts each piece of work in its own git worktree with [wkt](https://github.com/wmxscott/wkt), opening a [Herdr](https://herdr.dev) workspace only when one is wanted | ✓ | ✓ | | |
+| [gh-app-auth](plugins/gh-app-auth) | Commits, pushes and opens pull requests as a per-org GitHub App bot through [gh-app-auth](https://github.com/AmadeusITGroup/gh-app-auth), with the user as co-author | ✓ | ✓ | ✓ | ✓ |
 
 ## Install
 
