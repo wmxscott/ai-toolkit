@@ -17,6 +17,10 @@
       "./pi/extensions/theme-switcher.ts"
     ],
     "themes": ["./pi/themes/catppuccin-latte.json", "./pi/themes/catppuccin-macchiato.json"],
-    "skills": ["./plugins/stacked-planning/skills", "./plugins/pr-tracker/skills"]
+    "skills": [
+      "./plugins/stacked-planning/skills",
+      "./plugins/pr-tracker/skills",
+      "./plugins/gh-app-auth/skills"
+    ]
   }
 }
