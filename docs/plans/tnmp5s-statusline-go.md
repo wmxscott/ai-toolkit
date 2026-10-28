@@ -13,7 +13,7 @@ With dozens of Claude Code sessions open, the statusline plugin keeps about 2 CP
 
 ### Done when
 
-- [ ] `/statusline:setup` on a clean macOS machine writes the new command with `refreshInterval: 15`, downloads the binary, and the statusline appears in a real Claude Code session.
+- [x] `/statusline:setup` on a clean macOS machine writes the new command with `refreshInterval: 15`, downloads the binary, and the statusline appears in a real Claude Code session.
 - [x] `scripts/bench_statusline.py` at 24 sessions shows, for the new binary compared with today's `statusline.py`, fewer than 10% of the processes started per second and fewer than 10% of the CPU. Results are posted in the final PR.
 - [x] A GitHub release `statusline-v<version>` exists with four binaries whose SHA-256 sums match `plugins/statusline/checksums.txt` on `main`.
 - [x] An existing setup still running `python3 ".../statusline.py"` sees the "run /statusline:setup" notice at session start, and setup then replaces the old block without the conflict prompt.
@@ -165,12 +165,12 @@ Two stacks. B (benchmark) touches only `scripts/bench_statusline.py` and its tes
 | A5 | Hook download and upgrade notice, setup changes, `version: 2.0.0` | A4 |
 | A6 | Remove `statusline.py` and its tests, README and `CLAUDE.md` docs, `version: 2.0.1` | A5 |
 
-- [ ] A1 — Go module and helpers
-- [ ] A2 — Rendering and theme
-- [ ] A3 — Git reading and cache
-- [ ] A4 — Build, checksums and CI
-- [ ] A5 — Download hook and setup
-- [ ] A6 — Retire Python and docs
+- [x] A1 — Go module and helpers
+- [x] A2 — Rendering and theme
+- [x] A3 — Git reading and cache
+- [x] A4 — Build, checksums and CI
+- [x] A5 — Download hook and setup
+- [x] A6 — Retire Python and docs
 
 **A1 — Go module and helpers**
 `go.mod` and a package with the palettes, icons and constants, and the helpers `number`, `fmtTokens`, `fmtCost`, `fmtDuration`, `fmtResets`, `pctColor` and `progressCircle`, with table tests ported from `tests/test_statusline.py`. Also a generator (under `plugins/statusline/tests/`, Python) that runs today's `statusline.py` on a set of recorded inputs (no git, fixed `now`, both themes) and writes golden files to `plugins/statusline/testdata/golden/`. Cites S4, S17, Input and rendering, Layout and build contract.
@@ -227,7 +227,7 @@ Add a `CLAUDE.md` note in "Adding a plugin" on versioned plugins and the bump ru
 |---|---|---|
 | B1 | Benchmark script and its smoke test | — |
 
-- [ ] B1 — Benchmark
+- [x] B1 — Benchmark
 
 **B1 — Benchmark**
 As in "Benchmark: `scripts/bench_statusline.py`". Cites S1, S3, S21.
@@ -270,4 +270,4 @@ The advisor tool is unavailable in this session, so here is my own case against 
 - 2026-10-28 — phase A4 landed as #26
 - 2026-10-28 — phase A5 landed as #27; release `statusline-v2.0.0` published, and a live download through the hook matched `checksums.txt`
 - 2026-10-28 — phase A6 landed as #28, 1 production line over the cap (401) inside the grace band: deleting the 400-line `statusline.py` can't be split. Benchmark, like for like at 1 s: 1.8% of the process starts and 6.8% of the CPU of the Python version (median redraw 8 ms against 289 ms)
-- 2026-10-28 — open Done-when item: `/statusline:setup` in a real session on the user's machine (checked only in a scratch home against the live release)
+- 2026-10-28 — last Done-when item met: `/statusline:setup` on the user's machine replaced the old Python block, installed the v2.0.1 binary and set `refreshInterval: 15`
