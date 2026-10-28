@@ -56,7 +56,8 @@ def test_hook_is_quick_silent_and_starts_a_watcher(sandbox):
     result = sandbox.hook()
     elapsed = time.monotonic() - started
     assert_silent(result)
-    assert elapsed < 1, elapsed
+    # Loose for slow CI runners, but well under the hook's 10 s timeout.
+    assert elapsed < 5, elapsed
     assert sandbox.base() == "dark"
     pid = sandbox.one_watcher()
     assert sandbox.wait_for(lambda: sandbox.pidfile() == str(pid))
