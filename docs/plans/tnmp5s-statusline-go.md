@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | draft |
+| **Status** | in progress · next: A1 |
 | **Updated** | 2026-10-28 |
 | **Tracker** | — |
 | **Related** | `plugins/statusline/`, [Claude Code statusline docs](https://code.claude.com/docs/en/statusline) |
@@ -22,7 +22,7 @@ With dozens of Claude Code sessions open, the statusline plugin keeps about 2 CP
 
 ## Settled — do not re-derive
 
-- **S1 (fact)** Today's cost per redraw is ~230 ms wall, ~85 ms CPU and ~11 processes: shell, a pyenv shim chain of ~6, Python, and 5 `git`. This was measured on an Apple Silicon Mac with `python3` as a pyenv shim. The pyenv shim alone costs ~150 ms. At `refreshInterval: 1` and 24 sessions that is ~2 cores.
+- **S1 (fact)** Today's cost per redraw is ~230 ms wall, ~85 ms CPU and ~11 processes: shell, a pyenv shim chain of ~6, Python, and 5 `git`. This was measured on an Apple Silicon Mac with `python3` as a pyenv shim. The pyenv shim alone costs ~150 ms. At `refreshInterval: 1` and 24 sessions that is ~2 cores. **Corrected by B1's benchmark (#21):** the process count was ~7× too low. pyenv's bash scripts fork a subshell for every `$(...)`, so the shim chain alone starts ~75 processes. Today's statusline at 24 sessions measured a median of 285 ms per redraw, 2.6 cores, and ~80 process starts per redraw (~1,900/s). Without the shim: 91 ms, 1.95 cores, ~6 per redraw.
 - **S2 (fact)** The plugin never runs `ps`; the "ps flood" guess was wrong. Sampling every process for 10 s found none except the sampler. theme-sync runs `ps` only at session start.
 - **S3 (fact)** Per redraw through `sh -c`, measured: floor (`/usr/bin/true`) 6.4 ms; Go 7.6 ms (~1 ms CPU); Rust 6.3 ms; Swift 7.8 ms; leanest direct Python 18.6 ms (~11 ms CPU). Each `git` call is 12–15 ms, nearly all process start-up.
 - **S4 (decision)** Go, standard library only. Rejected:
@@ -41,7 +41,7 @@ With dozens of Claude Code sessions open, the statusline plugin keeps about 2 CP
 - **S14 (decision)** The SHA-256 of each binary is committed in `plugins/statusline/checksums.txt`. The hook verifies downloads against it, not against anything next to the release.
 - **S15 (decision)** Existing setups are told to rerun setup, and only setup edits `settings.json`. The hook shows a notice; setup treats the old command as its own. Rejected: the hook rewriting `settings.json`; a README note only.
 - **S16 (decision)** Versioning starts at `2.0.0`, in `.claude-plugin/plugin.json` only. Once set, CI fails when anything under `plugins/statusline/` differs from `main` without a version bump, and every bump publishes a release (even with byte-identical binaries).
-- **S17 (decision)** Output parity: byte-for-byte for every input Claude Code really sends. Not emulated:
+- **S17 (decision)** Output parity: byte-for-byte for every input Claude Code really sends. *Amended during A1:* string inputs get only the common forms. ISO strings must be `YYYY-MM-DD{T| }HH:MM:SS[.f]` plus `Z`, `±HH:MM` or nothing, and numeric strings go through `strconv.ParseFloat`. A byte-level port of CPython's `fromisoformat` and `float()` was built and dropped as over-reach: it pushed A1 past the size cap for inputs Claude Code never sends. Go's tests list the forms Python accepts and Go rejects. Not emulated:
   - Python's exception text in the per-line error;
   - Python's acceptance of `NaN` and `Infinity` in JSON (Go treats them as invalid, i.e. `{}`).
 
@@ -157,7 +157,7 @@ Two stacks. B (benchmark) touches only `scripts/bench_statusline.py` and its tes
 
 | Phase | Lands | Depends on |
 |---|---|---|
-| A1 | Go module, palettes and formatting helpers, golden fixtures recorded from Python | — |
+| A1 | Go module, palettes and formatting helpers, golden fixtures recorded from Python (lands as two PRs at its split seam: goldens, then Go) | — |
 | A2 | Rendering of lines 2–3 and non-repo line 1, stdin parsing, theme, `main` | A1 |
 | A3 | `.git` reading, line-count cache, line 1 with git | A2 |
 | A4 | Reproducible build script, `checksums.txt`, Go CI job, version check, release workflow | A3 |
@@ -259,3 +259,6 @@ The advisor tool is unavailable in this session, so here is my own case against 
 - Windows: out of scope.
 
 ## Log
+
+- 2026-10-28 — phase B1 landed as #21
+- 2026-10-28 — plan amended: S1 corrected from B1's measurements; S17 narrowed to common string forms; A1 split at its named seam into two PRs (goldens, then Go module) to fit the size cap
