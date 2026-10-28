@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | in progress · next: A4 |
+| **Status** | in progress · next: A5 |
 | **Updated** | 2026-10-28 |
 | **Tracker** | — |
 | **Related** | `plugins/statusline/`, [Claude Code statusline docs](https://code.claude.com/docs/en/statusline) |
@@ -267,3 +267,4 @@ The advisor tool is unavailable in this session, so here is my own case against 
 - 2026-10-28 — phase A2 landed as #24
 - 2026-10-28 — phase A3 landed as #25
 - 2026-10-28 — plan amended: build adds `-buildvcs=false` (go build stamps the commit by default, so checksums never matched across commits); stack A owns the version-check script and the two repo-level tests A4 added
+- 2026-10-28 — phase A4 landed as #26
