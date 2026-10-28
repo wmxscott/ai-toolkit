@@ -1,5 +1,5 @@
 {
-  "description": "Keep a stable path to the current version's statusline script, so settings.json survives plugin updates",
+  "description": "Download the current version's statusline binary and keep a stable path to it, so settings.json survives plugin updates",
   "hooks": {
     "SessionStart": [
       {
