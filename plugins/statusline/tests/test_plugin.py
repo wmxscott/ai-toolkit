@@ -48,7 +48,7 @@ def shipped_files():
         text=True,
         check=True,
     ).stdout.splitlines()
-    return [PLUGIN / name for name in listed if not name.startswith("tests/")]
+    return [PLUGIN / name for name in listed if not name.startswith(("tests/", "testdata/"))]
 
 
 def test_no_fixed_install_paths():

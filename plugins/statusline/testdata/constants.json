@@ -1,0 +1,111 @@
+{
+  "reset": "\u001b[0m",
+  "bold": "\u001b[1m",
+  "dim": "\u001b[2m",
+  "palettes": {
+    "dark": {
+      "lavender": "\u001b[38;2;183;189;248m",
+      "sky": "\u001b[38;2;145;215;227m",
+      "mint": "\u001b[38;2;166;218;149m",
+      "gold": "\u001b[38;2;238;212;159m",
+      "coral": "\u001b[38;2;245;169;127m",
+      "rose": "\u001b[38;2;238;153;160m",
+      "silver": "\u001b[38;2;165;173;203m",
+      "muted": "\u001b[38;2;110;115;141m",
+      "bar_ok": "\u001b[38;2;139;213;202m",
+      "bar_warn": "\u001b[38;2;238;212;159m",
+      "bar_crit": "\u001b[38;2;237;135;150m",
+      "vim_normal": "\u001b[38;2;138;173;244m",
+      "vim_insert": "\u001b[38;2;166;218;149m",
+      "vim_visual": "\u001b[38;2;198;160;246m",
+      "vim_command": "\u001b[38;2;237;135;150m",
+      "effort_low": "\u001b[38;2;125;196;228m",
+      "effort_max": "\u001b[38;2;237;135;150m"
+    },
+    "light": {
+      "lavender": "\u001b[38;2;114;135;253m",
+      "sky": "\u001b[38;2;4;165;229m",
+      "mint": "\u001b[38;2;64;160;43m",
+      "gold": "\u001b[38;2;223;142;29m",
+      "coral": "\u001b[38;2;254;100;11m",
+      "rose": "\u001b[38;2;230;69;83m",
+      "silver": "\u001b[38;2;108;111;133m",
+      "muted": "\u001b[38;2;140;143;161m",
+      "bar_ok": "\u001b[38;2;23;146;153m",
+      "bar_warn": "\u001b[38;2;223;142;29m",
+      "bar_crit": "\u001b[38;2;210;15;57m",
+      "vim_normal": "\u001b[38;2;30;102;245m",
+      "vim_insert": "\u001b[38;2;64;160;43m",
+      "vim_visual": "\u001b[38;2;136;57;239m",
+      "vim_command": "\u001b[38;2;210;15;57m",
+      "effort_low": "\u001b[38;2;32;159;181m",
+      "effort_max": "\u001b[38;2;210;15;57m"
+    }
+  },
+  "icons": {
+    "model": "",
+    "bolt": "",
+    "db": "",
+    "clock": "󱎫",
+    "dollar": "",
+    "cal": "󱨲",
+    "vim": "",
+    "git": "",
+    "branch": "",
+    "style": "󱔏"
+  },
+  "em_dash": "—",
+  "circles": [
+    "◯",
+    "◔",
+    "◑",
+    "◕",
+    "●"
+  ],
+  "efforts": {
+    "low": [
+      "▁ low",
+      "effort_low"
+    ],
+    "medium": [
+      "▂ med",
+      "gold"
+    ],
+    "high": [
+      "▃ high",
+      "coral"
+    ],
+    "xhigh": [
+      "▅ xhigh",
+      "rose"
+    ],
+    "max": [
+      "█ max",
+      "effort_max"
+    ]
+  },
+  "vim_modes": {
+    "NORMAL": "vim_normal",
+    "INSERT": "vim_insert",
+    "VISUAL": "vim_visual",
+    "V-LINE": "vim_visual",
+    "V-BLOCK": "vim_visual",
+    "COMMAND": "vim_command",
+    "REPLACE": "coral"
+  },
+  "model_prefixes": [
+    [
+      "Claude Opus",
+      "Opus"
+    ],
+    [
+      "Claude Sonnet",
+      "Sonnet"
+    ],
+    [
+      "Claude Haiku",
+      "Haiku"
+    ]
+  ],
+  "max_untracked_bytes": 10485760
+}
