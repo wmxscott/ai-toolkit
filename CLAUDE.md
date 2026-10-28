@@ -99,8 +99,12 @@ uv run ruff check
 uv run ruff format --check
 git ls-files -co --exclude-standard '*.sh' | xargs uv run shellcheck
 scripts/validate.sh
+scripts/build_statusline.sh --check
+(cd plugins/statusline && test -z "$(gofmt -l .)" && go vet ./... && go test ./...)
 gitleaks dir . && gitleaks git .
 ```
+
+After changing statusline's Go code, run `scripts/build_statusline.sh` and commit the `plugins/statusline/checksums.txt` it writes. On a pull request, CI also runs `scripts/check_plugin_versions.sh` against the base branch: it fails when a plugin that has a `version` changed without bumping it.
 
 `scripts/validate.sh` runs `claude plugin validate` on the marketplace and on every plugin it lists. It fails on any error or warning, like `--strict`, except the missing-version warning (see "Adding a plugin"). It also runs `claude plugin test` on every plugin with `*.test.tsx` files (a mod: a plugin whose `hooks.json` lists TypeScript `modules`; see the `plugin-authoring` skill). It needs `jq` and the `claude` CLI, but no login. Codex has no validate command, so when `codex` is installed the script installs every Codex plugin into a throwaway `CODEX_HOME` and checks that Codex loads each skill and hook and lists each skill for the model, except one whose `agents/openai.yaml` forbids implicit use; it never touches `~/.codex`. Tests that drive shell scripts build their environment from scratch and stub external tools on `PATH`, so they never touch the real terminal, multiplexer or `$HOME`.
 

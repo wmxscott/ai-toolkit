@@ -1,0 +1,47 @@
+name: Release statusline
+
+on:
+  push:
+    branches: [main]
+    paths: ["plugins/statusline/**"]
+
+permissions:
+  contents: write
+
+concurrency: release-statusline
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Find an unreleased version
+        id: version
+        run: |
+          version=$(jq -r '.version // empty' plugins/statusline/.claude-plugin/plugin.json)
+          if [ -z "$version" ]; then
+            echo "::notice::plugins/statusline has no version; nothing to release"
+          elif git ls-remote --exit-code --tags origin "refs/tags/statusline-v$version" >/dev/null; then
+            echo "::notice::statusline-v$version is already released"
+          else
+            echo "version=$version" >>"$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-go@v6
+        if: steps.version.outputs.version
+        with:
+          go-version-file: plugins/statusline/go.mod
+          cache-dependency-path: plugins/statusline/go.mod
+      - name: Build and check
+        if: steps.version.outputs.version
+        run: scripts/build_statusline.sh --check --out dist
+      - name: Release
+        if: steps.version.outputs.version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "statusline-v$VERSION" dist/* \
+            --target "$GITHUB_SHA" \
+            --title "statusline $VERSION" \
+            --notes "Binaries for the statusline plugin $VERSION. Their SHA-256 sums are in plugins/statusline/checksums.txt."
