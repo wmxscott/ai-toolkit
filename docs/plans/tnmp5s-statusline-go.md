@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | in progress · next: A5 |
+| **Status** | landed |
 | **Updated** | 2026-10-28 |
 | **Tracker** | — |
 | **Related** | `plugins/statusline/`, [Claude Code statusline docs](https://code.claude.com/docs/en/statusline) |
@@ -14,11 +14,11 @@ With dozens of Claude Code sessions open, the statusline plugin keeps about 2 CP
 ### Done when
 
 - [ ] `/statusline:setup` on a clean macOS machine writes the new command with `refreshInterval: 15`, downloads the binary, and the statusline appears in a real Claude Code session.
-- [ ] `scripts/bench_statusline.py` at 24 sessions shows, for the new binary compared with today's `statusline.py`, fewer than 10% of the processes started per second and fewer than 10% of the CPU. Results are posted in the final PR.
-- [ ] A GitHub release `statusline-v<version>` exists with four binaries whose SHA-256 sums match `plugins/statusline/checksums.txt` on `main`.
-- [ ] An existing setup still running `python3 ".../statusline.py"` sees the "run /statusline:setup" notice at session start, and setup then replaces the old block without the conflict prompt.
-- [ ] Go golden tests pass: byte-for-byte the same output as the Python script on the recorded inputs.
-- [ ] Every check in `CLAUDE.md` "Checks", plus the new Go checks, passes in CI.
+- [x] `scripts/bench_statusline.py` at 24 sessions shows, for the new binary compared with today's `statusline.py`, fewer than 10% of the processes started per second and fewer than 10% of the CPU. Results are posted in the final PR.
+- [x] A GitHub release `statusline-v<version>` exists with four binaries whose SHA-256 sums match `plugins/statusline/checksums.txt` on `main`.
+- [x] An existing setup still running `python3 ".../statusline.py"` sees the "run /statusline:setup" notice at session start, and setup then replaces the old block without the conflict prompt.
+- [x] Go golden tests pass: byte-for-byte the same output as the Python script on the recorded inputs.
+- [x] Every check in `CLAUDE.md` "Checks", plus the new Go checks, passes in CI.
 
 ## Settled — do not re-derive
 
@@ -268,3 +268,6 @@ The advisor tool is unavailable in this session, so here is my own case against 
 - 2026-10-28 — phase A3 landed as #25
 - 2026-10-28 — plan amended: build adds `-buildvcs=false` (go build stamps the commit by default, so checksums never matched across commits); stack A owns the version-check script and the two repo-level tests A4 added
 - 2026-10-28 — phase A4 landed as #26
+- 2026-10-28 — phase A5 landed as #27; release `statusline-v2.0.0` published, and a live download through the hook matched `checksums.txt`
+- 2026-10-28 — phase A6 landed as #28, 1 production line over the cap (401) inside the grace band: deleting the 400-line `statusline.py` can't be split. Benchmark, like for like at 1 s: 1.8% of the process starts and 6.8% of the CPU of the Python version (median redraw 8 ms against 289 ms)
+- 2026-10-28 — open Done-when item: `/statusline:setup` in a real session on the user's machine (checked only in a scratch home against the live release)
