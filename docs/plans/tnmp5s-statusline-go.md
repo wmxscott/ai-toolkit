@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | in progress · next: A1 |
+| **Status** | in progress · next: A2 |
 | **Updated** | 2026-10-28 |
 | **Tracker** | — |
 | **Related** | `plugins/statusline/`, [Claude Code statusline docs](https://code.claude.com/docs/en/statusline) |
@@ -262,3 +262,4 @@ The advisor tool is unavailable in this session, so here is my own case against 
 
 - 2026-10-28 — phase B1 landed as #21
 - 2026-10-28 — plan amended: S1 corrected from B1's measurements; S17 narrowed to common string forms; A1 split at its named seam into two PRs (goldens, then Go module) to fit the size cap
+- 2026-10-28 — phase A1 landed as #22 (goldens) and #23 (Go module)
