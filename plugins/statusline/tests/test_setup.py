@@ -1,3 +1,4 @@
+import ast
 import importlib.util
 import json
 import os
@@ -330,3 +331,10 @@ def test_shell_command_survives_the_shell(setup_module, monkeypatch, tmp_path):
 def test_is_old_command(setup_module, command, ours):
     block = {"type": "command", "command": command}
     assert setup_module.is_old_setup(block) is ours
+
+
+def test_parses_as_python_39():
+    source = SETUP.read_text()
+    assert source.startswith("#!/usr/bin/env python3\n")
+    assert "from __future__ import annotations" in source
+    ast.parse(source, feature_version=(3, 9))

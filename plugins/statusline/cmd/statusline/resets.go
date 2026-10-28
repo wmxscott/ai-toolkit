@@ -15,7 +15,7 @@ const (
 	maxUnix = 253402300799
 )
 
-// fmtResets ports statusline.py's fmt_resets for epoch seconds, epoch milliseconds and
+// fmtResets ports the Python statusline's fmt_resets for epoch seconds, epoch milliseconds and
 // ISO 8601 extended date-times; other strings Python's fromisoformat accepts give "?".
 func fmtResets(value any, now time.Time) string {
 	var at int64

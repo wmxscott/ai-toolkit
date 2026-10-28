@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// number mirrors statusline.py's number(): JSON numbers and numeric strings, never booleans.
+// number mirrors the Python statusline's number(): JSON numbers and numeric strings, never booleans.
 func number(v any) (float64, bool) {
 	switch x := v.(type) {
 	case float64:

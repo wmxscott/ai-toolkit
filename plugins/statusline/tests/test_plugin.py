@@ -37,7 +37,7 @@ def test_setup_skill_runs_the_bundled_script_and_preapproves_it():
 
 
 def test_versioned_for_the_binary_release():
-    assert MANIFEST["version"] == "2.0.0"
+    assert MANIFEST["version"] == "2.0.1"
 
 
 def test_checksums_cover_every_platform_the_hook_downloads():
@@ -65,7 +65,7 @@ def shipped_files():
 
 def test_no_fixed_install_paths():
     files = shipped_files()
-    assert PLUGIN / "scripts" / "statusline.py" in files
+    assert PLUGIN / "scripts" / "link_statusline.sh" in files
     for path in files:
         if path.is_file():
             text = path.read_text()
