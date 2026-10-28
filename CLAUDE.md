@@ -42,6 +42,8 @@ pyproject.toml                    dev tooling only (pytest, ruff, shellcheck), m
 
 `tests/test_marketplace.py` fails if a plugin directory, its marketplace entry and its README row get out of sync.
 
+statusline is the one versioned plugin, because its Go binary is released by version. Once a plugin sets `version`, every change under its directory needs a bump, which CI enforces with `scripts/check_plugin_versions.sh`. For statusline, merging a bump to `main` makes `.github/workflows/release-statusline.yml` publish the release `statusline-v<version>`.
+
 ## Codex support
 
 Add it only when the plugin works in Codex without its Claude-only parts. Skills carry over. Hooks can too: Codex reads `hooks/hooks.json` in Claude's format, sets `CLAUDE_PLUGIN_ROOT` for hook commands, names its shell tool `Bash` and sends a Claude-shaped payload. It runs a plugin's hooks only after the user trusts them in `/hooks`, so say so in the plugin's README.

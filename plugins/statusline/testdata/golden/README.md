@@ -1,4 +1,4 @@
-Golden output of `scripts/statusline.py`, written by `tests/gen_golden.py`. Do not edit by hand.
+Golden output recorded from the retired Python statusline (`scripts/statusline.py`, version 1.x). The script is gone, so they are fixed fixtures now: change one only when the Go statusline's output is meant to change. `../constants.json` holds its palettes, icons and other constants, recorded at the same time.
 
 Each `<case>.json` is a statusline input; `<case>.dark.txt` and `<case>.light.txt` are the exact
 stdout of `render(input, theme)`. They were recorded with:

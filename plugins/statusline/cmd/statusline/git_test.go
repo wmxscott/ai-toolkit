@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-var realGit, python string
+var realGit string
 
 func TestMain(m *testing.M) {
 	if os.Getenv("STATUSLINE_TEST_MAIN") == "1" {
@@ -28,7 +28,6 @@ func TestMain(m *testing.M) {
 		os.Setenv(k, v)
 	}
 	realGit, _ = exec.LookPath("git")
-	python, _ = exec.LookPath("python3")
 	os.Exit(m.Run())
 }
 
@@ -198,30 +197,6 @@ func TestGitInfo(t *testing.T) {
 			got := gitInfo(cwd, "", time.Time{})
 			if (got == nil) != (want == nil) || got != nil && *got != *want {
 				t.Errorf("gitInfo = %+v, want %+v", got, want)
-			}
-		})
-	}
-}
-
-// TestLine1MatchesPython runs statusline.py on the same repositories.
-func TestLine1MatchesPython(t *testing.T) {
-	if python == "" {
-		t.Skip("python3 is not installed")
-	}
-	for _, tc := range gitCases {
-		t.Run(tc.name, func(t *testing.T) {
-			cwd, _ := tc.setup(t)
-			in := `{"cwd": "` + cwd + `"}`
-			cmd := exec.Command(python, "../../scripts/statusline.py")
-			cmd.Stdin = strings.NewReader(in)
-			cmd.Env = append(os.Environ(), "CLAUDE_STATUSLINE_THEME=dark")
-			want, err := cmd.Output()
-			if err != nil {
-				t.Fatal(err)
-			}
-			got := render(parseInput([]byte(in)), &dark, env{home: os.Getenv("HOME")})
-			if got != string(want) {
-				t.Errorf("render mismatch\n got: %q\nwant: %q", got, want)
 			}
 		})
 	}
