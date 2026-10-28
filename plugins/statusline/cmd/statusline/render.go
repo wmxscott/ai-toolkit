@@ -22,10 +22,6 @@ type gitDetails struct {
 	added, deleted    int
 }
 
-func gitInfo(cwd string) *gitDetails {
-	return nil
-}
-
 // parseInput returns the JSON object in b, or an empty map for anything else.
 func parseInput(b []byte) map[string]any {
 	dec := json.NewDecoder(bytes.NewReader(b))
