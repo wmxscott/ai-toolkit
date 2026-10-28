@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Point Claude Code's statusLine setting at the plugin's stable script path.
+"""Point Claude Code's statusLine setting at the plugin's stable binary path.
 
-Links DATA_DIR/statusline.py to this plugin version's script, then sets
-statusLine in settings.json, keeping every other key. A symlinked
-settings.json is written through to its target.
+Downloads this plugin version's binary to DATA_DIR/statusline through the
+SessionStart hook, then sets statusLine in settings.json, keeping every other
+key. A symlinked settings.json is written through to its target. The old
+Python statusline's setting counts as setup's own and is replaced without
+asking.
 
 Exit status: 0 done or already set, 1 error, 3 a different statusLine is set
 and --force was not given.
@@ -14,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -21,6 +24,7 @@ import tempfile
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANAGED_KEYS = ("type", "command", "padding", "refreshInterval")
 EXIT_CONFLICT = 3
+OLD_COMMAND = re.compile(r'python3 "(?:[^"\\]|\\.)*/statusline-ai-toolkit/statusline\.py"')
 
 
 class SetupError(Exception):
@@ -39,21 +43,25 @@ def shell_command(script: str) -> str:
         prefix, script = "$HOME", script[len(home) :]
     for ch in '\\"$`':
         script = script.replace(ch, "\\" + ch)
-    return f'python3 "{prefix}{script}"'
+    return f'"{prefix}{script}"'
 
 
-def link_script(data_dir: str) -> str:
-    target = os.path.join(PLUGIN_ROOT, "scripts", "statusline.py")
-    link = os.path.join(data_dir, "statusline.py")
+def fetch_binary(data_dir: str) -> str:
     env = {**os.environ, "CLAUDE_PLUGIN_ROOT": PLUGIN_ROOT, "CLAUDE_PLUGIN_DATA": data_dir}
     subprocess.run(
-        ["bash", os.path.join(PLUGIN_ROOT, "scripts", "link_statusline.sh")],
+        ["bash", os.path.join(PLUGIN_ROOT, "scripts", "link_statusline.sh"), "--foreground"],
         env=env,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
         check=False,
     )
-    if not (os.path.islink(link) and os.readlink(link) == target):
-        raise SetupError(f"could not link {link} to {target}")
-    return link
+    return os.path.join(data_dir, "statusline")
+
+
+def is_old_setup(current: object) -> bool:
+    command = current.get("command") if isinstance(current, dict) else None
+    return isinstance(command, str) and OLD_COMMAND.fullmatch(command) is not None
 
 
 def load(path: str) -> dict:
@@ -103,8 +111,11 @@ def show(value: object) -> str:
 def setup(data_dir: str, settings: str, force: bool) -> int:
     if not os.path.isabs(data_dir):
         raise SetupError(f"data dir must be an absolute path, got {data_dir!r}")
-    link = link_script(data_dir)
-    print(f"Linked {link} -> {os.readlink(link)}")
+    link = fetch_binary(data_dir)
+    if os.path.isfile(link):
+        print(f"Installed {link} -> {os.path.realpath(link)}")
+    else:
+        print("The statusline isn't downloaded yet. It appears once the download completes.")
 
     target = os.path.realpath(settings)
     via = f" (through the symlink {settings})" if os.path.islink(settings) else ""
@@ -117,14 +128,15 @@ def setup(data_dir: str, settings: str, force: bool) -> int:
         "type": "command",
         "command": shell_command(link),
         "padding": 0,
-        "refreshInterval": 1,
+        "refreshInterval": 15,
         **extras,
     }
 
     if current == desired:
         print(f"statusLine in {target} already runs this statusline. Nothing changed.")
         return 0
-    if current is not None and not force:
+    old = is_old_setup(current)
+    if current is not None and not (force or old):
         print(f"{target}{via} already has a different statusLine:")
         print(show(current))
         print("Proposed:")
@@ -140,6 +152,10 @@ def setup(data_dir: str, settings: str, force: bool) -> int:
         print(show(current))
     print("New statusLine:")
     print(show(desired))
+    old_link = os.path.join(data_dir, "statusline.py")
+    if old and os.path.islink(old_link):
+        os.unlink(old_link)
+        print(f"Removed the old {old_link} link.")
     return 0
 
 

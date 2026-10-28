@@ -11,19 +11,22 @@ import pytest
 
 PLUGIN = Path(__file__).resolve().parent.parent
 SETUP = PLUGIN / "scripts" / "setup_statusline.py"
-COMMAND = 'python3 "$HOME/.claude/plugins/data/statusline-ai-toolkit/statusline.py"'
-EXPECTED = {"type": "command", "command": COMMAND, "padding": 0, "refreshInterval": 1}
+COMMAND = '"$HOME/.claude/plugins/data/statusline-ai-toolkit/statusline"'
+EXPECTED = {"type": "command", "command": COMMAND, "padding": 0, "refreshInterval": 15}
+OLD = 'python3 "$HOME/.claude/plugins/data/statusline-ai-toolkit/statusline.py"'
 
 
 class Env:
-    def __init__(self, home: Path):
+    def __init__(self, home: Path, release):
         self.home = home
+        self.release = release
         self.claude = home / ".claude"
         self.settings = self.claude / "settings.json"
         self.data = self.claude / "plugins" / "data" / "statusline-ai-toolkit"
-        self.env = {"HOME": str(home), "PATH": os.environ["PATH"]}
+        self.env = {"HOME": str(home), "PATH": str(release.tools)}
 
-    def run(self, *args, data=None, script=SETUP):
+    def run(self, *args, data=None):
+        script = self.release.root / "scripts" / "setup_statusline.py"
         return subprocess.run(
             [sys.executable, str(script), str(data or self.data), *args],
             env=self.env,
@@ -40,22 +43,34 @@ class Env:
     def read(self, path=None):
         return json.loads((path or self.settings).read_text())
 
+    def binary(self, version="2.0.0"):
+        return self.data / "bin" / f"statusline-{version}-darwin-arm64"
+
 
 @pytest.fixture
-def env(tmp_path):
+def env(tmp_path, release):
     home = tmp_path / "home"
     home.mkdir()
-    return Env(home)
+    return Env(home, release)
 
 
-def test_fresh_install_creates_settings_and_link(env):
+def test_fresh_install_downloads_and_creates_settings(env):
     result = env.run()
     assert result.returncode == 0, result.stderr
     assert env.read() == {"statusLine": EXPECTED}
-    link = env.data / "statusline.py"
-    assert os.readlink(link) == str(PLUGIN / "scripts" / "statusline.py")
+    assert os.readlink(env.data / "statusline") == str(env.binary())
     assert "New statusLine" in result.stdout
     assert json.dumps(COMMAND) in result.stdout
+    assert "once the download completes" not in result.stdout
+
+
+def test_writes_settings_even_when_the_download_fails(env):
+    shutil.rmtree(env.release.serve)
+    result = env.run()
+    assert result.returncode == 0, result.stderr
+    assert env.read() == {"statusLine": EXPECTED}
+    assert not os.path.lexists(env.data / "statusline")
+    assert "once the download completes" in result.stdout
 
 
 def test_keeps_every_other_key_in_order(env):
@@ -124,6 +139,51 @@ def test_force_replaces_it_and_keeps_extra_statusline_keys(env):
     assert "Old statusLine" in result.stdout
 
 
+def old_setup(env, command):
+    env.data.mkdir(parents=True)
+    (env.data / "statusline.py").symlink_to("/old/install/scripts/statusline.py")
+    block = {"type": "command", "command": command, "padding": 0, "refreshInterval": 1}
+    env.write({"model": "opus", "statusLine": {**block, "hideVimModeIndicator": True}})
+
+
+@pytest.mark.parametrize("absolute", [False, True])
+def test_replaces_the_old_python_setup_without_asking(env, absolute):
+    command = f'python3 "{env.data}/statusline.py"' if absolute else OLD
+    old_setup(env, command)
+    result = env.run()
+    assert result.returncode == 0, result.stderr
+    assert env.read() == {
+        "model": "opus",
+        "statusLine": {**EXPECTED, "hideVimModeIndicator": True},
+    }
+    assert not os.path.lexists(env.data / "statusline.py")
+    assert os.readlink(env.data / "statusline") == str(env.binary())
+    assert "Old statusLine" in result.stdout
+    assert "systemMessage" not in result.stdout
+
+
+def test_keeps_an_old_statusline_py_that_is_not_a_link(env):
+    old_setup(env, OLD)
+    (env.data / "statusline.py").unlink()
+    (env.data / "statusline.py").write_text("mine")
+    assert env.run().returncode == 0
+    assert (env.data / "statusline.py").read_text() == "mine"
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        'python3 "/elsewhere/statusline.py"',
+        f"{OLD} --theme dark",
+        'python3 "$HOME/.claude/plugins/data/other-ai-toolkit/statusline.py"',
+    ],
+)
+def test_asks_before_replacing_a_lookalike_command(env, command):
+    old_setup(env, command)
+    assert env.run().returncode == 3
+    assert os.path.islink(env.data / "statusline.py")
+
+
 def test_same_command_with_other_options_still_asks(env):
     env.write({"statusLine": {**EXPECTED, "padding": 2}})
     assert env.run().returncode == 3
@@ -170,7 +230,8 @@ def test_honours_claude_config_dir(env, tmp_path):
     assert env.run(data=data).returncode == 0
     assert not env.settings.exists()
     written = env.read(config / "settings.json")["statusLine"]["command"]
-    assert written == f'python3 "{data}/statusline.py"'
+    assert written == f'"{data}/statusline"'
+    assert os.path.isfile(data / "statusline")
 
 
 def test_settings_flag(env, tmp_path):
@@ -189,28 +250,28 @@ def test_configured_command_runs_the_statusline(env):
     assert env.run().returncode == 0
     command = env.read()["statusLine"]["command"]
     result = subprocess.run(
-        ["sh", "-c", command],
+        ["/bin/sh", "-c", command],
         input='{"model": {"display_name": "Claude Opus 4.7"}}',
-        env={**env.env, "CLAUDE_STATUSLINE_THEME": "dark"},
+        env=env.env,
         cwd=env.home,
         capture_output=True,
         text=True,
         timeout=20,
     )
     assert result.returncode == 0, result.stderr
-    assert "Opus 4.7" in result.stdout
+    assert result.stdout == "statusline 2.0.0 darwin-arm64\n"
 
 
-def test_rerun_after_an_update_keeps_the_same_command(env, tmp_path):
+def test_rerun_after_an_update_keeps_the_same_command(env):
     assert env.run().returncode == 0
     before = env.settings.read_bytes()
-    new_root = tmp_path / "v2"
-    shutil.copytree(PLUGIN / "scripts", new_root / "scripts")
-    result = env.run(script=new_root / "scripts" / "setup_statusline.py")
+    env.release.publish("2.1.0")
+    result = env.run()
     assert result.returncode == 0, result.stderr
     assert "Nothing changed" in result.stdout
     assert env.settings.read_bytes() == before
-    assert os.readlink(env.data / "statusline.py") == str(new_root / "scripts" / "statusline.py")
+    assert os.readlink(env.data / "statusline") == str(env.binary("2.1.0"))
+    assert not env.binary().exists()
 
 
 @pytest.fixture
@@ -223,31 +284,49 @@ def setup_module(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    ("home", "script", "expected"),
+    ("home", "path", "expected"),
     [
-        ("/h", "/h/.claude/x/statusline.py", 'python3 "$HOME/.claude/x/statusline.py"'),
-        ("/h", "/other/statusline.py", 'python3 "/other/statusline.py"'),
-        ("/h", "/hx/statusline.py", 'python3 "/hx/statusline.py"'),
-        ("/h", '/h/a "b" $c `d`/s.py', 'python3 "$HOME/a \\"b\\" \\$c \\`d\\`/s.py"'),
+        ("/h", "/h/.claude/x/statusline", '"$HOME/.claude/x/statusline"'),
+        ("/h", "/other/statusline", '"/other/statusline"'),
+        ("/h", "/hx/statusline", '"/hx/statusline"'),
+        ("/h", '/h/a "b" $c `d`/s', '"$HOME/a \\"b\\" \\$c \\`d\\`/s"'),
     ],
 )
-def test_shell_command(setup_module, monkeypatch, home, script, expected):
+def test_shell_command(setup_module, monkeypatch, home, path, expected):
     monkeypatch.setenv("HOME", home)
-    assert setup_module.shell_command(script) == expected
+    assert setup_module.shell_command(path) == expected
 
 
 def test_shell_command_survives_the_shell(setup_module, monkeypatch, tmp_path):
     home = tmp_path / 'my "home" $dir'
-    script = home / "sub `x`" / "print.py"
-    script.parent.mkdir(parents=True)
-    script.write_text("import sys; print(sys.argv[0])\n")
+    program = home / "sub `x`" / "print"
+    program.parent.mkdir(parents=True)
+    program.write_text('#!/bin/sh\necho "$0"\n')
+    program.chmod(0o755)
     monkeypatch.setenv("HOME", str(home))
-    command = setup_module.shell_command(str(script))
+    command = setup_module.shell_command(str(program))
     out = subprocess.run(
-        ["sh", "-c", command],
-        env={"HOME": str(home), "PATH": os.environ["PATH"]},
+        ["/bin/sh", "-c", command],
+        env={"HOME": str(home), "PATH": "/usr/bin:/bin"},
         capture_output=True,
         text=True,
         check=True,
     ).stdout
-    assert out.strip() == str(script)
+    assert out.strip() == str(program)
+
+
+@pytest.mark.parametrize(
+    ("command", "ours"),
+    [
+        (OLD, True),
+        ('python3 "/Users/x/.claude/plugins/data/statusline-ai-toolkit/statusline.py"', True),
+        ('python3 "$HOME/my \\"dir\\"/statusline-ai-toolkit/statusline.py"', True),
+        ('python3 "/elsewhere/statusline.py"', False),
+        (f"{OLD}; rm -rf ~", False),
+        ('"$HOME/.claude/plugins/data/statusline-ai-toolkit/statusline"', False),
+        (None, False),
+    ],
+)
+def test_is_old_command(setup_module, command, ours):
+    block = {"type": "command", "command": command}
+    assert setup_module.is_old_setup(block) is ours

@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 
 PLUGIN = Path(__file__).resolve().parent.parent
+MANIFEST = json.loads((PLUGIN / ".claude-plugin" / "plugin.json").read_text())
 HOOKS = json.loads((PLUGIN / "hooks" / "hooks.json").read_text())["hooks"]
 SKILL = (PLUGIN / "skills" / "setup" / "SKILL.md").read_text()
 
@@ -33,6 +34,17 @@ def test_setup_skill_runs_the_bundled_script_and_preapproves_it():
     assert meta["allowed-tools"] == f"Bash({command} *)"
     assert f'{command} "${{CLAUDE_PLUGIN_DATA}}"' in SKILL
     assert "--force" in SKILL
+
+
+def test_versioned_for_the_binary_release():
+    assert MANIFEST["version"] == "2.0.0"
+
+
+def test_checksums_cover_every_platform_the_hook_downloads():
+    names = [line.split()[1] for line in (PLUGIN / "checksums.txt").read_text().splitlines()]
+    assert sorted(names) == [
+        f"statusline-{os_}-{arch}" for os_ in ("darwin", "linux") for arch in ("amd64", "arm64")
+    ]
 
 
 def test_scripts_are_executable():
