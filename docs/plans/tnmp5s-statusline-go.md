@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | in progress · next: A3 |
+| **Status** | in progress · next: A4 |
 | **Updated** | 2026-10-28 |
 | **Tracker** | — |
 | **Related** | `plugins/statusline/`, [Claude Code statusline docs](https://code.claude.com/docs/en/statusline) |
@@ -61,7 +61,7 @@ With dozens of Claude Code sessions open, the statusline plugin keeps about 2 CP
 ### Layout and build contract
 
 - A Go module in `plugins/statusline/` (`go.mod` with `toolchain` pinned to the version used to produce `checksums.txt`; module path `github.com/wmxscott/ai-toolkit/plugins/statusline`). Package layout is the builder's call.
-- Reproducible build: `CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -buildid="` for each `GOOS/GOARCH` in S12. Binary names: `statusline-<os>-<arch>`.
+- Reproducible build: `CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "-s -w -buildid="` for each `GOOS/GOARCH` in S12. Binary names: `statusline-<os>-<arch>`.
 - Standard library only. No work at package init.
 
 ### Input and rendering
@@ -150,7 +150,8 @@ Two stacks. B (benchmark) touches only `scripts/bench_statusline.py` and its tes
 ### Stack A — Go statusline
 
 - **Base:** `main`
-- **Owns:** `plugins/statusline/**`, `scripts/build_statusline.sh`, `.github/workflows/**`, `CLAUDE.md`,
+- **Owns:** `plugins/statusline/**`, `scripts/build_statusline.sh`, `scripts/check_plugin_versions.sh`,
+  `.github/workflows/**`, `CLAUDE.md`, `tests/test_build_statusline.py`, `tests/test_check_plugin_versions.py`,
   `docs/plans/tnmp5s-statusline-go.md`
 - **Independent of:** B
 - **Depends on:** —
@@ -264,3 +265,5 @@ The advisor tool is unavailable in this session, so here is my own case against 
 - 2026-10-28 — plan amended: S1 corrected from B1's measurements; S17 narrowed to common string forms; A1 split at its named seam into two PRs (goldens, then Go module) to fit the size cap
 - 2026-10-28 — phase A1 landed as #22 (goldens) and #23 (Go module)
 - 2026-10-28 — phase A2 landed as #24
+- 2026-10-28 — phase A3 landed as #25
+- 2026-10-28 — plan amended: build adds `-buildvcs=false` (go build stamps the commit by default, so checksums never matched across commits); stack A owns the version-check script and the two repo-level tests A4 added

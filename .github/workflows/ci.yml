@@ -12,6 +12,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: plugins/statusline/go.mod
+          cache-dependency-path: plugins/statusline/go.mod
       - name: Lint
         run: |
           uv run ruff check
@@ -19,11 +23,19 @@ jobs:
           git ls-files -co --exclude-standard '*.sh' | xargs uv run shellcheck
       - name: Test
         run: uv run pytest
+      - name: Go
+        working-directory: plugins/statusline
+        run: |
+          test -z "$(gofmt -l . | tee /dev/stderr)"
+          go vet ./...
+          go test ./...
 
   validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
@@ -33,6 +45,17 @@ jobs:
         run: npm install --global @anthropic-ai/claude-code @openai/codex
       - name: Validate marketplace and plugins
         run: scripts/validate.sh
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: plugins/statusline/go.mod
+          cache-dependency-path: plugins/statusline/go.mod
+      - name: Reproduce statusline checksums
+        run: scripts/build_statusline.sh --check
+      - name: Plugin version bumps
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: scripts/check_plugin_versions.sh "origin/$BASE_REF"
 
   secrets:
     runs-on: ubuntu-latest
