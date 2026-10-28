@@ -14,14 +14,15 @@ func main() {
 	home := os.Getenv("HOME")
 	cwd, _ := os.Getwd()
 
-	src := themeSource{home: home, now: now}
+	var cacheDir string
 	if dir, err := os.UserCacheDir(); err == nil {
-		src.cacheDir = filepath.Join(dir, "ai-toolkit-statusline")
+		cacheDir = filepath.Join(dir, "ai-toolkit-statusline")
 	}
+	src := themeSource{home: home, cacheDir: cacheDir, now: now}
 	if runtime.GOOS == "darwin" {
 		src.appearance = func() (string, error) { return readAppearance("defaults") }
 	}
 	p, _ := paletteFor(detectTheme(src))
 
-	os.Stdout.WriteString(render(parseInput(in), p, env{now: now, home: home, cwd: cwd}))
+	os.Stdout.WriteString(render(parseInput(in), p, env{now: now, home: home, cwd: cwd, cacheDir: cacheDir}))
 }
