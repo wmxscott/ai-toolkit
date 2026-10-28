@@ -12,9 +12,10 @@ import (
 )
 
 type env struct {
-	now  time.Time
-	home string
-	cwd  string
+	now      time.Time
+	home     string
+	cwd      string
+	cacheDir string
 }
 
 type gitDetails struct {
@@ -143,7 +144,7 @@ func line1(d map[string]any, p *palette, e env) (string, error) {
 		parts = append(parts, vimBadge(p, mode))
 	}
 
-	if gi := gitInfo(cwd); gi != nil {
+	if gi := gitInfo(cwd, e.cacheDir, e.now); gi != nil {
 		parts = append(parts, gitParts(p, gi)...)
 	} else {
 		home := strings.TrimRight(e.home, "/")

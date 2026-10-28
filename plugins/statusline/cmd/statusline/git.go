@@ -25,7 +25,7 @@ type repoAt struct {
 	root, gitDir, rel, branch string
 }
 
-func gitInfo(cwd string) *gitDetails {
+func gitInfo(cwd, cacheDir string, now time.Time) *gitDetails {
 	dir, err := filepath.EvalSymlinks(cwd)
 	if err != nil {
 		return nil
@@ -41,7 +41,7 @@ func gitInfo(cwd string) *gitDetails {
 		return nil
 	}
 	gi := &gitDetails{repo: filepath.Base(r.root), branch: r.branch, rel: r.rel}
-	gi.added, gi.deleted = lineCounts(r.root)
+	gi.added, gi.deleted = cachedCounts(r.root, r.gitDir, cacheDir, now)
 	return gi
 }
 

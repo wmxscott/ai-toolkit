@@ -7,11 +7,16 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 var realGit, python string
 
 func TestMain(m *testing.M) {
+	if os.Getenv("STATUSLINE_TEST_MAIN") == "1" {
+		main()
+		os.Exit(0)
+	}
 	for _, k := range []string{"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_CEILING_DIRECTORIES"} {
 		os.Unsetenv(k)
 	}
@@ -190,7 +195,7 @@ func TestGitInfo(t *testing.T) {
 	for _, tc := range gitCases {
 		t.Run(tc.name, func(t *testing.T) {
 			cwd, want := tc.setup(t)
-			got := gitInfo(cwd)
+			got := gitInfo(cwd, "", time.Time{})
 			if (got == nil) != (want == nil) || got != nil && *got != *want {
 				t.Errorf("gitInfo = %+v, want %+v", got, want)
 			}
@@ -259,7 +264,7 @@ func calls(t *testing.T, log string) []string {
 func TestReadingGitStartsOnlyTheCountCommands(t *testing.T) {
 	root := newRepo(t, "project")
 	log := gitShim(t, "")
-	if gi := gitInfo(root); gi == nil || gi.branch != "main" {
+	if gi := gitInfo(root, "", time.Time{}); gi == nil || gi.branch != "main" {
 		t.Fatalf("gitInfo = %+v", gi)
 	}
 	want := []string{"0:diff --shortstat HEAD", "0:ls-files -z --others --exclude-standard"}
