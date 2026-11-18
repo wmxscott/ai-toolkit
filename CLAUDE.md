@@ -20,6 +20,7 @@ plugins/<name>/
   skills/<skill>/SKILL.md         skills, if any
   skills/<skill>/scripts/         files a skill runs, if it must work outside Claude Code
   hooks/hooks.json                hooks, if any (loaded automatically; don't list it in plugin.json)
+  hooks/codex.json                Codex's hooks, only if they differ (named by .codex-plugin/plugin.json's `hooks`)
   hooks/*.tsx                     a mod's hooks module and its *.test.tsx tests, if any
   scripts/                        scripts used by hooks and skills
   README.md                       user-facing docs
@@ -51,6 +52,7 @@ Add it only when the plugin works in Codex without its Claude-only parts. Skills
 1. Write the Codex manifest. Copy `name`, `description`, `author`, `homepage`, `repository`, `license` and `keywords` from the Claude manifest verbatim, and add `interface` (`displayName`, `shortDescription`, `developerName: "wmxscott"`, `category`, `capabilities`, `websiteURL`).
    - Without hooks: `plugins/<name>/plugin.json` in the [Agent Plugins](https://agent-plugins.org) format (`"$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json"`), which Codex prefers, with `interface` under `extensions."com.openai"`.
    - With hooks: `plugins/<name>/.codex-plugin/plugin.json`, Codex's own format, with `interface` at the top level. Codex (0.156.1) loads no hooks for an Agent Plugins manifest.
+   - Hooks that must differ in Codex: add `"hooks": "./hooks/codex.json"` to that manifest. Codex (0.170.0) then reads that file in place of `hooks/hooks.json`, not as well, and Claude Code never reads it. switchboard does this to pass the agent's name and list only Codex's events; Codex ignores events it doesn't know, so don't add the file just to drop those.
    - Never both: Codex reads the root manifest first, so a second one would only drift.
 2. Add an entry to `.agents/plugins/marketplace.json`: `name`, `source: {"source": "local", "path": "./plugins/<name>"}`, `policy: {"installation": "AVAILABLE", "authentication": "ON_INSTALL"}`, `category`.
 3. Tick the Codex column in the `README.md` table.
@@ -61,7 +63,7 @@ Leave `version` out of both manifests (the tests require them to agree). Codex t
 
 Codex ignores `disable-model-invocation`. To keep it from running a skill on its own, add `skills/<skill>/agents/openai.yaml` with `policy:` / `allow_implicit_invocation: false`; users still run it as `$<plugin>:<skill>`. Codex doesn't substitute `$ARGUMENTS` either, so a skill that reads it must say where the arguments are otherwise: the rest of the user's message.
 
-`tests/test_codex.py` checks the Codex marketplace and manifests: format, schema, entry shape, agreement with the Claude manifest, and the README column.
+`tests/test_codex.py` checks the Codex marketplace and manifests: format, schema, entry shape, agreement with the Claude manifest, a manifest's `hooks` file, and the README column.
 
 ## Pi and OpenCode support
 
@@ -108,7 +110,7 @@ gitleaks dir . && gitleaks git .
 
 After changing statusline's Go code, run `scripts/build_statusline.sh` and commit the `plugins/statusline/checksums.txt` it writes. On a pull request, CI also runs `scripts/check_plugin_versions.sh` against the base branch: it fails when a plugin that has a `version` changed without bumping it.
 
-`scripts/validate.sh` runs `claude plugin validate` on the marketplace and on every plugin it lists. It fails on any error or warning, like `--strict`, except the missing-version warning (see "Adding a plugin"). It also runs `claude plugin test` on every plugin with `*.test.tsx` files (a mod: a plugin whose `hooks.json` lists TypeScript `modules`; see the `plugin-authoring` skill). It needs `jq` and the `claude` CLI, but no login. Codex has no validate command, so when `codex` is installed the script installs every Codex plugin into a throwaway `CODEX_HOME` and checks that Codex loads each skill and hook and lists each skill for the model, except one whose `agents/openai.yaml` forbids implicit use; it never touches `~/.codex`. Tests that drive shell scripts build their environment from scratch and stub external tools on `PATH`, so they never touch the real terminal, multiplexer or `$HOME`.
+`scripts/validate.sh` runs `claude plugin validate` on the marketplace and on every plugin it lists. It fails on any error or warning, like `--strict`, except the missing-version warning (see "Adding a plugin"). It also runs `claude plugin test` on every plugin with `*.test.tsx` files (a mod: a plugin whose `hooks.json` lists TypeScript `modules`; see the `plugin-authoring` skill). It needs `jq` and the `claude` CLI, but no login. Codex has no validate command, so when `codex` is installed the script installs every Codex plugin into a throwaway `CODEX_HOME` and checks that Codex loads each skill, loads each plugin's hooks from the file its manifest names (`hooks/hooks.json` by default) and lists each skill for the model, except one whose `agents/openai.yaml` forbids implicit use; it never touches `~/.codex`. Tests that drive shell scripts build their environment from scratch and stub external tools on `PATH`, so they never touch the real terminal, multiplexer or `$HOME`.
 
 ## Style
 

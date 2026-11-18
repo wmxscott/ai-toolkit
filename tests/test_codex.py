@@ -41,6 +41,23 @@ INTERFACE_STRINGS = {
     "brandColor",
 }
 INTERFACE_LISTS = {"capabilities", "defaultPrompt"}
+# HookEventsToml in Codex 0.170.0.
+CODEX_HOOK_EVENTS = {
+    "PreModelRequest",
+    "PostModelRequest",
+    "PreToolUse",
+    "PermissionRequest",
+    "PostToolUse",
+    "PreCompact",
+    "PostCompact",
+    "SessionStart",
+    "SessionEnd",
+    "UserPromptSubmit",
+    "SubagentStart",
+    "SubagentStop",
+    "Stop",
+    "Interrupt",
+}
 
 
 def codex_manifest_path(name):
@@ -134,9 +151,23 @@ def test_manifest_agrees_with_claude_manifest(name):
 @pytest.mark.parametrize("name", [n for n in codex_plugins() if not is_agent_plugins_manifest(n)])
 def test_codex_format_manifest_shape(name):
     """Codex's own format: the shared fields plus a top-level `interface`. Hooks come from
-    hooks/hooks.json, like Claude Code's."""
+    hooks/hooks.json, like Claude Code's, unless `hooks` names another file."""
     manifest = codex_manifest(name)
-    assert set(manifest) <= {*SHARED_FIELDS, "interface"}
+    assert set(manifest) <= {*SHARED_FIELDS, "interface", "hooks"}
+
+
+@pytest.mark.parametrize("name", [n for n in codex_plugins() if "hooks" in codex_manifest(n)])
+def test_codex_hooks_override(name):
+    """Codex reads the file `hooks` names in place of hooks/hooks.json. It ignores a path that
+    doesn't start with `./` or that climbs out of the plugin, and any event it doesn't know."""
+    path = codex_manifest(name)["hooks"]
+    assert isinstance(path, str) and path.startswith("./"), path
+    assert ".." not in path.split("/"), path
+    hooks = PLUGINS / name / path
+    assert hooks.is_file(), path
+    events = json.loads(hooks.read_text())["hooks"]
+    assert events
+    assert set(events) <= CODEX_HOOK_EVENTS, set(events) - CODEX_HOOK_EVENTS
 
 
 @pytest.mark.parametrize("name", codex_plugins())
