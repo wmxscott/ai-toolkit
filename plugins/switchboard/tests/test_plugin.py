@@ -8,6 +8,7 @@ HOOKS = json.loads((PLUGIN / "hooks" / "hooks.json").read_text())["hooks"]
 # The events switchboard's `hook` handles, each with the matcher that limits it to the calls
 # that can change an agent's state. None runs it on every occurrence.
 EXPECTED = {
+    "SessionStart": None,
     "UserPromptSubmit": None,
     "PreToolUse": "AskUserQuestion|ExitPlanMode",
     "PostToolUse": None,

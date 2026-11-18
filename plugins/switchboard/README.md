@@ -24,6 +24,7 @@ Claude Code only.
 
 | Hook | Matches | Tells switchboard |
 |---|---|---|
+| `SessionStart` | every source | A session started, so it shows as idle before its first prompt |
 | `UserPromptSubmit` | | A turn started |
 | `PreToolUse` | `AskUserQuestion`, `ExitPlanMode` | An agent is waiting for your answer |
 | `PermissionRequest` | every tool | An agent is waiting for your permission |
