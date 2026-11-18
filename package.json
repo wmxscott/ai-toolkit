@@ -14,6 +14,7 @@
       "./pi/extensions/display.ts",
       "./pi/extensions/pr-tracker.ts",
       "./pi/extensions/statusline.ts",
+      "./pi/extensions/switchboard.ts",
       "./pi/extensions/theme-switcher.ts"
     ],
     "themes": ["./pi/themes/catppuccin-latte.json", "./pi/themes/catppuccin-macchiato.json"],
