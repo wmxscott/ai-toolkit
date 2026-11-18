@@ -89,6 +89,37 @@ It needs pr-tracker 1.1.0 or later, 1.2.0 for delivery on every tool and prompt,
 
 Pi has no MCP support of its own, so most PRs it records come from `bash`. `pr-tracker adopt` attaches any other.
 
+## `switchboard.ts`
+
+Reports Pi's state to [switchboard](https://github.com/wmxscott/switchboard), a tmux session switcher that shows which agents are working, which are done and which need you. It does for Pi what the [switchboard plugin](../plugins/switchboard)'s hooks do for Claude Code and Codex, so a Pi session shows in the switcher and the status bar as `pi`.
+
+Each event runs `switchboard hook --agent pi <event>` with the event as JSON on stdin, and the CLI decides what it means:
+
+| Pi event | Tells switchboard |
+|---|---|
+| `session_start` | A session started, or was reloaded, resumed or forked |
+| `agent_start` | A run started |
+| `ui_prompt_start`, `ui_prompt_end` | An extension's dialog is waiting for you, or has closed |
+| Plannotator's `plannotator:session-opened`, `plannotator:session-closed` | A [Plannotator](https://github.com/backnotprop/plannotator) review is open, or has closed |
+| `agent_settled` | The run ended, or you aborted it |
+| `session_shutdown` | The session is ending. On quit, switchboard forgets it |
+
+Pi has no permission prompts of its own, so ▲ (needs you) comes only from extension dialogs, such as a permission gate's (`ctx.ui.select`, `confirm`, `input`, `editor` and `custom`), and from open Plannotator reviews. The limits:
+
+- Pi's built-in waits, such as the project trust prompt and `/login`, send no event, so they don't show as ▲.
+- An extension's `ctx.ui.custom()` UI shows as ▲ even when it isn't waiting for you.
+- A Plannotator review left open across `/reload` loses its ▲.
+
+It needs tmux, Pi 1.1.0 or later and the switchboard CLI 1.1.0 or later. The [switchboard README](https://github.com/wmxscott/switchboard) covers the tmux side.
+
+```sh
+brew install wmxscott/tap/switchboard
+```
+
+It acts only in Pi's terminal UI inside tmux, and not in a [pi-subagents](https://github.com/nicobailon/pi-subagents) child (`PI_SUBAGENT_CHILD=1`), which inherits its parent's `$TMUX_PANE`. It looks for `switchboard` on `PATH`, then in `/opt/homebrew/bin`, `/usr/local/bin`, `/home/linuxbrew/.linuxbrew/bin` and `~/.local/bin`, once per session. Without it, the extension does nothing.
+
+It never waits for the CLI, except when you quit. Each call runs in the background, one at a time and in order, even across `/reload`, and is killed after 5 seconds. On quit, Pi waits up to a second for the last calls. The CLI's output and failures are ignored, and once 64 calls are waiting, later events are dropped.
+
 ## Themes
 
 `themes/catppuccin-latte.json` and `themes/catppuccin-macchiato.json` are [Catppuccin](https://catppuccin.com) Latte and Macchiato for Pi. Pick them in `/settings`, or let theme-switcher do it.

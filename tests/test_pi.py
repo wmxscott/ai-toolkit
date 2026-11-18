@@ -550,13 +550,13 @@ FAUX_FLAGS = ("--provider", "faux", "--model", "faux-1")
 FAUX_COMMAND = "echo https://github.com/owner/repo/pull/7; echo $PI_SESSION_ID"
 
 
-def run_pi_turn(sandbox, settles=1, extension=None, command=FAUX_COMMAND):
+def run_pi_turn(sandbox, settles=1, extensions=(), command=FAUX_COMMAND):
     """A real Pi in RPC mode, with a faux model that runs one bash `command`, prompted once
     and read until it has settled `settles` times. Loads the package installed in a
-    throwaway home, or only `extension`. Returns Pi's output records."""
+    throwaway home, or only `extensions`. Returns Pi's output records."""
     agent = sandbox.home / ".pi" / "agent"
     agent.mkdir(parents=True)
-    packages = [str(ROOT)] if extension is None else []
+    packages = [] if extensions else [str(ROOT)]
     (agent / "settings.json").write_text(json.dumps({"packages": packages}))
     faux = sandbox.root / "faux.ts"
     faux.write_text(FAUX_MODEL)
@@ -569,9 +569,9 @@ def run_pi_turn(sandbox, settles=1, extension=None, command=FAUX_COMMAND):
         "PI_TELEMETRY": "0",
         "FAUX_COMMAND": command,
     }
-    extensions = ["-e", str(extension)] if extension else []
+    loaded = [flag for path in extensions for flag in ("-e", str(path))]
     pi = subprocess.Popen(
-        ["pi", "--mode", "rpc", "--no-session", *extensions, "-e", str(faux), *FAUX_FLAGS],
+        ["pi", "--mode", "rpc", "--no-session", *loaded, "-e", str(faux), *FAUX_FLAGS],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -683,7 +683,7 @@ def test_pi_wakes_a_real_idle_session_for_failing_checks(tmp_path):
     extension.write_text(quick)
     sandbox = PrTrackerSandbox(tmp_path, "pi", "node")
     sandbox.stub("wake", wake_on=2)
-    records = run_pi_turn(sandbox, settles=2, extension=extension)
+    records = run_pi_turn(sandbox, settles=2, extensions=[extension])
     stops = [payload for args, payload in sandbox.calls() if args == STOP]
     assert [payload.get("stop_hook_active") for payload in stops[:3]] == [False, None, False]
     assert delivered(records) == [("pr-tracker", NEWS)]
@@ -707,3 +707,328 @@ def test_pi_filter_keeps_only_pr_trackers_skills(tmp_path):
         "skill:prs",
     }
     assert "statusline" in commands
+
+
+# switchboard.ts: forwards Pi's events to `switchboard hook --agent pi`. Its tests stub the
+# CLI and build every environment from scratch, so no real switchboard or tmux is reached.
+SWITCHBOARD = PI_DIR / "extensions" / "switchboard.ts"
+PANE = "%7"
+# Logs each call's arguments, stdin and pane, then fails noisily in broken mode. In hang mode
+# the first call ignores SIGTERM and outlives the extension's timeout.
+SWITCHBOARD_STUB = r"""#!/bin/bash
+payload=$(cat)
+printf 'start %s\n' "$4" >> "$STUB_OUT/log"
+if [ "$STUB_MODE" = hang ] && [ "$4" = session_start ]; then
+  trap '' TERM
+  sleep 7
+fi
+sleep "$STUB_SLEEP"
+n=$(ls "$STUB_OUT" | grep -c '[.]json$')
+printf '%s\n' "$@" > "$STUB_OUT/$n.args"
+printf '%s' "${TMUX_PANE-}" > "$STUB_OUT/$n.pane"
+printf '%s' "$payload" > "$STUB_OUT/$n.json"
+printf 'end %s\n' "$4" >> "$STUB_OUT/log"
+printf 'stub noise\n'
+printf 'stub noise\n' >&2
+if [ "$STUB_MODE" = broken ]; then exit 1; fi
+"""
+
+
+class SwitchboardSandbox(PrTrackerSandbox):
+    """pr-tracker's sandbox in a tmux pane, with a switchboard stub instead."""
+
+    def __init__(self, root: Path, *tools: str):
+        super().__init__(root, *tools)
+        path = self.env["PATH"]
+        assert not shutil.which("switchboard", path=path), "a real switchboard would leak in"
+        self.env |= {"SWITCHBOARD_HOOK_FALLBACK_PATH": "", "TMUX_PANE": PANE, "STUB_SLEEP": "0"}
+
+    def stub(self, mode="ok", sleep=0):
+        path = self.bin / "switchboard"
+        path.write_text(SWITCHBOARD_STUB)
+        path.chmod(0o755)
+        self.env |= {"STUB_MODE": mode, "STUB_SLEEP": str(sleep)}
+
+    def calls(self):
+        return [
+            (
+                (self.out / f"{n}.args").read_text().split(),
+                json.loads((self.out / f"{n}.json").read_text()),
+                (self.out / f"{n}.pane").read_text(),
+            )
+            for n in range(len(list(self.out.glob("*.json"))))
+        ]
+
+    def log(self):
+        path = self.out / "log"
+        return path.read_text().splitlines() if path.exists() else []
+
+
+# A fake Pi event API whose `pi` and `ctx` throw outside a handler, as a stale one does.
+# Steps fire a handler ("on") or emit on the event bus ("bus"). A handler's returned promise
+# is awaited, as Pi would, and the time and the calls the stub had logged by then recorded.
+# Then it waits for the extension's queue to empty, so the stub's log is complete.
+SWITCHBOARD_HARNESS = """
+import { readdirSync } from "node:fs";
+const { default: extension } = await import(process.argv[1]);
+let live = true;
+const guard = (target) => new Proxy(target, {
+  get(object, key) {
+    if (!live) throw new Error(`used outside a handler: ${String(key)}`);
+    return object[key];
+  },
+});
+const handlers = {};
+const listeners = {};
+extension(guard({
+  on: (name, handler) => { handlers[name] = handler; },
+  events: {
+    on: (channel, handler) => {
+      (listeners[channel] ??= []).push(handler);
+      return () => {};
+    },
+  },
+}));
+live = false;
+const ctx = guard({ mode: process.env.HARNESS_MODE, isIdle: () => true });
+const logged = () => readdirSync(process.env.STUB_OUT).filter((f) => f.endsWith(".json")).length;
+const out = { returned: [], blocked: 0, waited: [], logged: [] };
+for (const [kind, name, data] of JSON.parse(process.env.HARNESS_STEPS)) {
+  const start = Date.now();
+  live = true;
+  const result = kind === "bus"
+    ? void (listeners[name] ?? []).forEach((handler) => handler(data))
+    : handlers[name]({ type: name, ...data }, ctx);
+  live = false;
+  out.blocked += Date.now() - start;
+  if (kind === "bus") continue;
+  out.returned.push(result instanceof Promise ? "promise" : (result ?? null));
+  if (result instanceof Promise) {
+    const before = Date.now();
+    await result;
+    out.waited.push(Date.now() - before);
+    out.logged.push(logged());
+  }
+}
+// The CLI's processes are unref'd: a running Pi is what keeps node alive for them.
+const alive = setInterval(() => {}, 1000);
+await globalThis[Symbol.for("ai-toolkit:switchboard:queue")].tail;
+clearInterval(alive);
+console.log(JSON.stringify(out));
+"""
+
+OPENED = {"id": "pn-0a1b2c", "action": "plan-review", "url": "http://localhost:4000"}
+RUN = [
+    ["on", "session_start", {"reason": "startup"}],
+    ["on", "agent_start", {}],
+    ["on", "ui_prompt_start", {"reason": "ui_prompt", "kind": "confirm", "title": "Allow?"}],
+    ["on", "ui_prompt_end", {"reason": "ui_prompt", "kind": "confirm", "title": "Allow?"}],
+    ["bus", "plannotator:session-opened", OPENED],
+    ["bus", "plannotator:session-closed", {**OPENED, "outcome": "approved"}],
+    ["on", "agent_settled", {"aborted": False}],
+    ["on", "session_shutdown", {"reason": "quit"}],
+]
+RUN_CALLS = [
+    ("session_start", {"reason": "startup", "idle": True}),
+    ("agent_start", {}),
+    ("ui_prompt_start", {"kind": "confirm"}),
+    ("ui_prompt_end", {}),
+    ("plannotator_opened", {"id": "pn-0a1b2c"}),
+    ("plannotator_closed", {"id": "pn-0a1b2c"}),
+    ("agent_settled", {"aborted": False}),
+    ("session_shutdown", {"reason": "quit"}),
+]
+HANDLERS = sum(kind == "on" for kind, _, _ in RUN)
+
+
+def hook_calls(events):
+    return [
+        (["hook", "--agent", "pi", name], {"event": name, **fields}, PANE)
+        for name, fields in events
+    ]
+
+
+def run_switchboard(sandbox, steps, mode="tui"):
+    """Load switchboard.ts in node against the fake Pi event API and run `steps` through it."""
+    stripped = strip_types(SWITCHBOARD)
+    assert stripped.returncode == 0, stripped.stderr
+    module = sandbox.root / "switchboard.mjs"
+    module.write_text(stripped.stdout)
+    done = subprocess.run(
+        ["node", "--input-type=module", "-e", SWITCHBOARD_HARNESS, str(module)],
+        capture_output=True,
+        text=True,
+        env={**sandbox.env, "HARNESS_MODE": mode, "HARNESS_STEPS": json.dumps(steps)},
+        cwd=sandbox.work,
+        timeout=60,
+    )
+    assert (done.returncode, done.stderr) == (0, "")
+    return json.loads(done.stdout)
+
+
+def test_package_carries_switchboards_extension():
+    assert "./pi/extensions/switchboard.ts" in EXTENSIONS
+    assert "(pi/README.md#switchboardts)" in README
+    assert "`switchboard.ts`" in PI_README
+
+
+@needs_strip_types
+def test_switchboard_forwards_each_event_and_drains_on_quit(tmp_path):
+    sandbox = SwitchboardSandbox(tmp_path, "node")
+    sandbox.stub()
+    result = run_switchboard(sandbox, RUN)
+    assert sandbox.calls() == hook_calls(RUN_CALLS)
+    assert result["returned"] == [None] * (HANDLERS - 1) + ["promise"], "only quit waits"
+    assert result["logged"] == [len(RUN_CALLS)]
+
+
+@needs_strip_types
+@pytest.mark.parametrize("reason", ["reload", "new", "resume", "fork"])
+def test_switchboard_waits_only_on_quit(tmp_path, reason):
+    sandbox = SwitchboardSandbox(tmp_path, "node")
+    sandbox.stub()
+    steps = [
+        ["on", "session_start", {"reason": reason}],
+        ["bus", "plannotator:session-opened", {"action": "plan-review"}],
+        ["on", "agent_settled", {"aborted": True}],
+        ["on", "session_shutdown", {"reason": reason}],
+    ]
+    result = run_switchboard(sandbox, steps)
+    assert result["returned"] == [None] * 3
+    assert sandbox.calls() == hook_calls(
+        [
+            ("session_start", {"reason": reason, "idle": True}),
+            ("agent_settled", {"aborted": True}),
+            ("session_shutdown", {"reason": reason}),
+        ]
+    )
+
+
+@needs_strip_types
+@pytest.mark.parametrize(
+    ("mode", "env", "stub"),
+    [
+        ("tui", {"TMUX_PANE": None}, True),
+        ("tui", {"TMUX_PANE": ""}, True),
+        ("rpc", {}, True),
+        ("json", {}, True),
+        ("print", {}, True),
+        ("tui", {"PI_SUBAGENT_CHILD": "1"}, True),
+        ("tui", {}, False),
+    ],
+    ids=["no-tmux", "empty-pane", "rpc", "json", "print", "subagent-child", "no-cli"],
+)
+def test_switchboard_does_nothing_unless_a_tui_in_tmux_with_the_cli(tmp_path, mode, env, stub):
+    sandbox = SwitchboardSandbox(tmp_path, "node")
+    if stub:
+        sandbox.stub()
+    for key, value in env.items():
+        if value is None:
+            del sandbox.env[key]
+        else:
+            sandbox.env[key] = value
+    result = run_switchboard(sandbox, RUN, mode)
+    assert result["returned"] == [None] * HANDLERS
+    assert sandbox.log() == []
+
+
+@needs_strip_types
+def test_switchboard_calls_the_cli_one_at_a_time_in_order(tmp_path):
+    sandbox = SwitchboardSandbox(tmp_path, "node")
+    sandbox.stub(sleep=0.2)
+    result = run_switchboard(sandbox, RUN)
+    names = [name for name, _ in RUN_CALLS]
+    assert sandbox.log() == [f"{edge} {name}" for name in names for edge in ("start", "end")]
+    assert sandbox.calls() == hook_calls(RUN_CALLS)
+    assert result["blocked"] < 100, "no handler waits for the CLI"
+    [waited] = result["waited"]
+    assert 950 <= waited < 1600, "quit waits for the queue for at most a second"
+    assert result["logged"][0] < len(names)
+
+
+@needs_strip_types
+def test_switchboard_drops_calls_past_its_queue_limit(tmp_path):
+    sandbox = SwitchboardSandbox(tmp_path, "node")
+    sandbox.stub()
+    steps = [["on", "session_start", {"reason": "startup"}]] + [["on", "agent_start", {}]] * 99
+    run_switchboard(sandbox, steps)
+    assert len(sandbox.calls()) == 64
+
+
+@needs_strip_types
+def test_switchboard_ignores_a_failing_noisy_cli(tmp_path):
+    sandbox = SwitchboardSandbox(tmp_path, "node")
+    sandbox.stub("broken")
+    result = run_switchboard(sandbox, RUN)
+    assert sandbox.calls() == hook_calls(RUN_CALLS)
+    assert result["logged"] == [len(RUN_CALLS)]
+
+
+@needs_strip_types
+def test_switchboard_kills_a_hung_cli_and_moves_on(tmp_path):
+    sandbox = SwitchboardSandbox(tmp_path, "node")
+    sandbox.stub("hang")
+    steps = [["on", "session_start", {"reason": "startup"}], ["on", "agent_start", {}]]
+    run_switchboard(sandbox, steps)
+    assert sandbox.log() == ["start session_start", "start agent_start", "end agent_start"]
+    assert sandbox.calls() == hook_calls([("agent_start", {})])
+
+
+@needs_strip_types
+def test_switchboard_finds_the_cli_in_the_fallback_dirs(tmp_path):
+    sandbox = SwitchboardSandbox(tmp_path, "node")
+    sandbox.stub()
+    fallback = tmp_path / "fallback"
+    (sandbox.bin / "switchboard").rename(fallback.mkdir() or fallback / "switchboard")
+    sandbox.env["SWITCHBOARD_HOOK_FALLBACK_PATH"] = str(fallback)
+    run_switchboard(sandbox, RUN)
+    assert sandbox.calls() == hook_calls(RUN_CALLS)
+
+
+# A test-only extension that asks the user something on every tool call, as a permission
+# gate would. Unanswered, the dialog closes itself.
+CONFIRM = """
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+
+export default function (pi: ExtensionAPI) {
+\tpi.on("tool_call", async (_event, ctx) => {
+\t\tawait ctx.ui.confirm("Allow?", "switchboard test", { timeout: 100 });
+\t});
+}
+"""
+
+
+def confirming(tmp_path):
+    path = tmp_path / "confirm.ts"
+    path.write_text(CONFIRM)
+    return path
+
+
+@needs_pi
+def test_pi_switchboard_stays_out_of_rpc_mode(tmp_path):
+    sandbox = SwitchboardSandbox(tmp_path, "pi", "node")
+    sandbox.stub()
+    run_pi_turn(sandbox, extensions=[SWITCHBOARD, confirming(tmp_path)])
+    assert sandbox.log() == []
+
+
+@needs_pi
+def test_pi_switchboard_reports_a_real_run(tmp_path):
+    source = SWITCHBOARD.read_text()
+    widened = source.replace('ctx.mode !== "tui"', '!["tui", "rpc"].includes(ctx.mode)')
+    assert widened != source
+    extension = tmp_path / "switchboard.ts"
+    extension.write_text(widened)
+    sandbox = SwitchboardSandbox(tmp_path, "pi", "node")
+    sandbox.stub()
+    run_pi_turn(sandbox, extensions=[extension, confirming(tmp_path)])
+    assert sandbox.calls() == hook_calls(
+        [
+            ("session_start", {"reason": "startup", "idle": True}),
+            ("agent_start", {}),
+            ("ui_prompt_start", {"kind": "confirm"}),
+            ("ui_prompt_end", {}),
+            ("agent_settled", {"aborted": False}),
+            ("session_shutdown", {"reason": "quit"}),
+        ]
+    )
