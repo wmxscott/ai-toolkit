@@ -15,6 +15,8 @@ SYSTEM_PATH = "/usr/bin:/bin"
 STUB = """#!/bin/bash
 printf '%s\\n' "$@" > "$STUB_DIR/args"
 cat > "$STUB_DIR/stdin"
+printf 'stub noise\\n' >&2
+exit "${STUB_STATUS:-0}"
 """
 
 COMMANDS = {
@@ -86,6 +88,16 @@ def test_hands_the_event_and_payload_to_the_cli(sandbox, event):
     assert (result.returncode, result.stdout, result.stderr) == (0, b"", b"")
     assert sandbox.calls() == ["hook", event]
     assert sandbox.stdin_seen() == payload(event)
+
+
+@pytest.mark.parametrize("status", [1, 2, 127])
+@pytest.mark.parametrize("event", COMMANDS)
+def test_a_failing_cli_never_reaches_the_session(sandbox, event, status):
+    sandbox.stub()
+    sandbox.env["STUB_STATUS"] = str(status)
+    result = sandbox.run(COMMANDS[event], payload(event))
+    assert (result.returncode, result.stdout, result.stderr) == (0, b"", b"")
+    assert sandbox.calls() == ["hook", event]
 
 
 @pytest.mark.parametrize("pane", [None, ""])

@@ -6,4 +6,6 @@ if [ -z "${TMUX_PANE-}" ] || ! command -v switchboard >/dev/null 2>&1; then
     exit 0
 fi
 
-exec switchboard hook "$1"
+# A nonzero status could deny a tool or keep a turn going, so a failing CLI is ignored.
+switchboard hook "$1" 2>/dev/null
+exit 0

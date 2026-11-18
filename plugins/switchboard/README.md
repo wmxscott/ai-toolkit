@@ -34,4 +34,4 @@ Claude Code only.
 | `SubagentStop` | every agent | A subagent finished |
 | `SessionEnd` | every reason | The session ended, or was cleared or switched with `/clear` or `/resume` |
 
-Each hook runs `scripts/hook.sh <event>`, which exits 0 at once when `$TMUX_PANE` is unset or `switchboard` isn't on `PATH`, and otherwise hands the payload to `switchboard hook <event>`. The CLI never prints and always exits 0, so it can't block a turn. Each hook times out after 5 seconds; an update usually takes a few tens of milliseconds.
+Each hook runs `scripts/hook.sh <event>`, which exits 0 at once when `$TMUX_PANE` is unset or `switchboard` isn't on `PATH`, and otherwise hands the payload to `switchboard hook <event>`. It drops the CLI's stderr and always exits 0, so a failing CLI can't deny a tool or keep a turn going. Each hook times out after 5 seconds; an update usually takes a few tens of milliseconds.
