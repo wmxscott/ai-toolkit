@@ -9,6 +9,7 @@ import pytest
 PLUGIN = Path(__file__).resolve().parent.parent
 ROOT = PLUGIN.parent.parent
 SKILL = (PLUGIN / "skills" / "worktrees" / "SKILL.md").read_text()
+README = (PLUGIN / "README.md").read_text()
 BLOCKS = re.findall(r"^```sh\n(.+?)\n```$", SKILL, re.M | re.S)
 [FALLBACK] = [block for block in BLOCKS if block.startswith("branch=<branch>\n")]
 GIT = shutil.which("git") or "/usr/bin/git"
@@ -60,24 +61,32 @@ def test_frontmatter_is_portable():
 def test_command_surface_matches_wkt():
     commands = [b for b in BLOCKS if b.startswith("wkt ")]
     assert commands == [
-        "wkt new -b <branch> [-s <source>] [-n <label>] [--no-herdr]",
-        "wkt rename -b <new-branch> [-n <label>] [-y] [--no-herdr]",
+        "wkt new -b <branch> [-s <source>] [-n <name>] [--tmux | --herdr]",
+        "wkt rename -b <new-branch> [-n <name>] [-y]",
+        "wkt rm [-b <branch>] [-f]",
+        "wkt rm --merged [-y]",
         "wkt setup <repo-url>",
         "wkt adopt",
     ]
 
 
-def test_describes_wkt_1_0():
+def test_describes_wkt_2_0():
     for fact in (
         "`$WKT_ROOT/<org>/<repo>/<branch>`",
         "defaults to `~/.herdr/worktrees`",
         "`.bare` layouts",
         "with `--no-track`",
         "`brew install wmxscott/tap/wkt`",
-        "Pass `--no-herdr` by default",
+        "Run plain `wkt new -b <branch>` by default",
+        "Never pass `--tmux` unprompted",
+        "Never pass `-f`",
+        "add `-y` only once they agree",
         "open_in_herdr=\n",
     ):
         assert fact in SKILL, fact
+    for gone in ("--no-herdr", "HERDR_TAB_ID", "inside Herdr"):
+        assert gone.lower() not in SKILL.lower(), gone
+        assert gone.lower() not in README.lower(), gone
     assert not re.search(r"\btabs?\b", SKILL, re.I), "Herdr calls them workspaces"
     assert "DEV_DIR" not in SKILL
     assert "herdr-wkt" not in SKILL and "HERDR_WKT_ROOT" not in SKILL

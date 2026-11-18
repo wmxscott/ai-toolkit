@@ -69,7 +69,7 @@
     {
       "name": "wkt",
       "source": "./plugins/wkt",
-      "description": "Starts each piece of work in its own git worktree with wkt, opening a Herdr workspace only when one is wanted",
+      "description": "Starts each piece of work in its own git worktree with wkt, opening a tmux session or Herdr workspace only when asked",
       "category": "development"
     },
     {
