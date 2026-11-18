@@ -22,7 +22,7 @@ The repository is a Claude Code plugin marketplace, a Codex one, and a Pi and Op
 | [pr-tracker](plugins/pr-tracker) | Tracks the pull requests a session opens and tells it when their checks or reviews change, through the [pr-tracker](https://github.com/wmxscott/pr-tracker) CLI | ✓ | ✓ | ✓ | |
 | [wkt](plugins/wkt) | Starts each piece of work in its own git worktree with [wkt](https://github.com/wmxscott/wkt), opening a tmux session or [Herdr](https://herdr.dev) workspace only when asked | ✓ | ✓ | | |
 | [gh-app-auth](plugins/gh-app-auth) | Commits, pushes and opens pull requests as a per-org GitHub App bot through [gh-app-auth](https://github.com/AmadeusITGroup/gh-app-auth), with the user as co-author | ✓ | ✓ | ✓ | ✓ |
-| [switchboard](plugins/switchboard) | Reports each agent's state to [switchboard](https://github.com/wmxscott/switchboard), which shows in tmux which agents are working, done or need you | ✓ | | | |
+| [switchboard](plugins/switchboard) | Reports each agent's state to [switchboard](https://github.com/wmxscott/switchboard), which shows in tmux which agents are working, done or need you | ✓ | ✓ | | |
 
 ## Install
 

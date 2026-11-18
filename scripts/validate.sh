@@ -5,9 +5,10 @@
 # hooks module tests (*.test.tsx) also runs them with `claude plugin test`.
 #
 # When codex is installed, also install every Codex plugin into a throwaway
-# CODEX_HOME and check Codex loads each of its skills and hooks, and lists
-# each skill for the model unless its agents/openai.yaml says not to. Codex has
-# no validate command, so loading the plugins is the check.
+# CODEX_HOME and check Codex loads each of its skills, loads its hooks from the
+# file its manifest names, and lists each skill for the model unless its
+# agents/openai.yaml says not to. Codex has no validate command, so loading the
+# plugins is the check.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -67,11 +68,12 @@ codex_rpc() {
     exec 3>&-
     wait "$pid" || true
     jq -s '{skills: [.[] | select(.id == 1) | .result.data[].skills[].name],
-            hooks: [.[] | select(.id == 2) | .result.data[].hooks[] | .pluginId // empty]}' "$out"
+            hooks: [.[] | select(.id == 2) | .result.data[].hooks[]
+                    | select(.pluginId) | {plugin: .pluginId, source: .sourcePath}]}' "$out"
 }
 
 validate_codex() {
-    local marketplace plugin skill prompt loaded listed
+    local marketplace plugin skill prompt loaded listed hooks
     sandbox=$(mktemp -d)
     trap 'rm -rf "$sandbox"' EXIT
     mkdir "$sandbox/codex"
@@ -111,11 +113,16 @@ validate_codex() {
                 echo "ok: codex loads $plugin:$skill, for explicit use only"
             fi
         done
-        if [ -f "plugins/$plugin/hooks/hooks.json" ]; then
-            if jq -e --arg p "$plugin@$marketplace" '.hooks | index($p)' <<<"$loaded" >/dev/null; then
-                echo "ok: codex loads $plugin's hooks"
+        # A manifest's `hooks` replaces hooks/hooks.json in Codex.
+        hooks=$(jq -r '.hooks // "./hooks/hooks.json" | ltrimstr(".")' \
+            "plugins/$plugin/.codex-plugin/plugin.json" 2>/dev/null || echo /hooks/hooks.json)
+        if [ -f "plugins/$plugin$hooks" ]; then
+            if jq -e --arg p "$plugin@$marketplace" --arg f "$hooks" \
+                '[.hooks[] | select(.plugin == $p)] | length > 0 and all(.source | endswith($f))' \
+                <<<"$loaded" >/dev/null; then
+                echo "ok: codex loads $plugin's hooks from ${hooks#/}"
             else
-                echo "codex does not load $plugin's hooks" >&2
+                echo "codex does not load $plugin's hooks from ${hooks#/} alone" >&2
                 status=1
             fi
         fi
