@@ -77,6 +77,12 @@
       "source": "./plugins/gh-app-auth",
       "description": "Commits, pushes and opens pull requests as a per-org GitHub App bot through gh-app-auth, with the user as co-author",
       "category": "development"
+    },
+    {
+      "name": "switchboard",
+      "source": "./plugins/switchboard",
+      "description": "Reports each Claude Code agent's state to the switchboard CLI, which shows in tmux which agents are working, done or need you",
+      "category": "productivity"
     }
   ]
 }
