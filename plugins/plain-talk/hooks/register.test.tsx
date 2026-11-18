@@ -40,6 +40,6 @@ test('adds the rules to the end of the system prompt', async ($, on) => {
   const { sections } = await $.prompt.compose({ model: 'm', promptModel: 'm', surfaces: ['terminal'], tools: [], outputStyle: null, traits: [] })
 
   expect(sections.map(s => s.id)).toEqual(['intro', 'plain-talk:rules'])
-  expect(sections[1].text).toContain('**Needs you**')
-  expect(sections[1].scope).toBe('session')
+  expect(sections[1]?.text).toContain('**Needs you**')
+  expect(sections[1]?.scope).toBe('session')
 })
