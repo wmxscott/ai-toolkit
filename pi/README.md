@@ -91,7 +91,7 @@ Pi has no MCP support of its own, so most PRs it records come from `bash`. `pr-t
 
 ## `switchboard.ts`
 
-Reports Pi's state to [switchboard](https://github.com/wmxscott/switchboard), a tmux session switcher that shows which agents are working, which are done and which need you. It does for Pi what the [switchboard plugin](../plugins/switchboard)'s hooks do for Claude Code, so a Pi session shows in the switcher and the status bar as `pi`.
+Reports Pi's state to [switchboard](https://github.com/wmxscott/switchboard), a tmux session switcher that shows which agents are working, which are done and which need you. It does for Pi what the [switchboard plugin](../plugins/switchboard)'s hooks do for Claude Code and Codex, so a Pi session shows in the switcher and the status bar as `pi`.
 
 Each event runs `switchboard hook --agent pi <event>` with the event as JSON on stdin, and the CLI decides what it means:
 
