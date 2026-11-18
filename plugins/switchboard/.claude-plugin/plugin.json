@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "switchboard",
+  "description": "Reports each Claude Code agent's state to the switchboard CLI, which shows in tmux which agents are working, done or need you",
+  "author": {
+    "name": "wmxscott"
+  },
+  "homepage": "https://github.com/wmxscott/ai-toolkit/tree/main/plugins/switchboard",
+  "repository": "https://github.com/wmxscott/ai-toolkit",
+  "license": "MIT",
+  "keywords": ["tmux", "agents", "status", "notifications", "hooks"]
+}
