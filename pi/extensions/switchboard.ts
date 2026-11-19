@@ -10,6 +10,9 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 const TIMEOUT_MS = 5_000;
 const DRAIN_MS = 1_000;
 const MAX_QUEUED = 64;
+const FIRST_LINE = /^.*\S.*$/m;
+// Counts code points, so the cut never splits a surrogate pair.
+const CAPPED = /^.{0,200}/su;
 const PLANNOTATOR: [string, string][] = [
 	["plannotator:session-opened", "plannotator_opened"],
 	["plannotator:session-closed", "plannotator_closed"],
@@ -90,6 +93,11 @@ function send(cli: string, event: string, fields: object = {}) {
 		});
 }
 
+function firstLine(text: string): string {
+	const line = text.match(FIRST_LINE)?.[0].trim() ?? "";
+	return line.match(CAPPED)?.[0] ?? "";
+}
+
 function drain(): Promise<void> {
 	return new Promise((resolve) => {
 		const timer = setTimeout(resolve, DRAIN_MS);
@@ -115,6 +123,13 @@ export default function (pi: ExtensionAPI) {
 		} catch {}
 	});
 
+	pi.on("input", (event) => {
+		try {
+			const text = firstLine(event.text);
+			if (cli && text) send(cli, "input", { text });
+		} catch {}
+	});
+
 	pi.on("agent_start", () => {
 		try {
 			if (cli) send(cli, "agent_start");
@@ -123,7 +138,7 @@ export default function (pi: ExtensionAPI) {
 
 	pi.on("ui_prompt_start", (event) => {
 		try {
-			if (cli) send(cli, "ui_prompt_start", { kind: event.kind });
+			if (cli) send(cli, "ui_prompt_start", { kind: event.kind, title: event.title });
 		} catch {}
 	});
 
