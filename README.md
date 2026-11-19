@@ -91,7 +91,7 @@ OpenCode caches the install. If a restart doesn't pick up a new version, clear i
 | [statusline](pi/README.md#statuslinets) | Three-line NerdFont footer: git, model, effort, context, tokens and cost, in Catppuccin colours that follow the system theme |
 | [theme-switcher](pi/README.md#theme-switcherts) | Switches Pi between Catppuccin Latte and Macchiato the moment the macOS appearance changes, through [theme-monitor](https://github.com/wmxscott/theme-monitor) |
 | [pr-tracker](pi/README.md#pr-trackerts) | Runs the [pr-tracker plugin](plugins/pr-tracker)'s hooks in Pi: records the PRs a session opens and hands their check and review changes back to it, waking it when it's idle |
-| [switchboard](pi/README.md#switchboardts) | Reports each Pi session's state to [switchboard](https://github.com/wmxscott/switchboard), which shows in tmux which agents are working, done or need you |
+| [switchboard](pi/README.md#switchboardts) | Reports each Pi session's state to [switchboard](https://github.com/wmxscott/switchboard), which shows in tmux which agents are working, done or need you. Its cards show a dialog's title and the prompt's first line |
 | [display](pi/README.md#displayts) | Draws code blocks in replies inside a frame labelled with their language. Adapted from [pix-display](https://github.com/xynogen/pix-mono/tree/main/packages/pix-display) by xynogen (MIT) |
 
 The themes are `catppuccin-latte` and `catppuccin-macchiato`.

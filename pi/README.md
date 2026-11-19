@@ -98,8 +98,9 @@ Each event runs `switchboard hook --agent pi <event>` with the event as JSON on 
 | Pi event | Tells switchboard |
 |---|---|
 | `session_start` | A session started, or was reloaded, resumed or forked |
+| `input` | You sent a prompt, with its first line that isn't blank, up to 200 characters. A blank prompt sends nothing |
 | `agent_start` | A run started |
-| `ui_prompt_start`, `ui_prompt_end` | An extension's dialog is waiting for you, or has closed |
+| `ui_prompt_start`, `ui_prompt_end` | An extension's dialog is waiting for you, with its title when it has one, or has closed |
 | Plannotator's `plannotator:session-opened`, `plannotator:session-closed` | A [Plannotator](https://github.com/backnotprop/plannotator) review is open, or has closed |
 | `agent_settled` | The run ended, or you aborted it |
 | `session_shutdown` | The session is ending. On quit, switchboard forgets it |
@@ -109,6 +110,8 @@ Pi has no permission prompts of its own, so ▲ (needs you) comes only from exte
 - Pi's built-in waits, such as the project trust prompt and `/login`, send no event, so they don't show as ▲.
 - An extension's `ctx.ui.custom()` UI shows as ▲ even when it isn't waiting for you.
 - A Plannotator review left open across `/reload` loses its ▲.
+
+switchboard's sidebar cards show the dialog's title, or its kind when it has none, as the reason a session needs you, and the prompt's first line as its task. An extension's own `/command` sends no line. A prompt that another extension handles itself, so that no run starts, may still send one.
 
 It needs tmux, Pi 1.1.0 or later and the switchboard CLI 1.1.0 or later. The [switchboard README](https://github.com/wmxscott/switchboard) covers the tmux side.
 

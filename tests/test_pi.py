@@ -818,8 +818,10 @@ console.log(JSON.stringify(out));
 """
 
 OPENED = {"id": "pn-0a1b2c", "action": "plan-review", "url": "http://localhost:4000"}
+PROMPT = "\n  \nFix the login bug\nthen run the tests\n"
 RUN = [
     ["on", "session_start", {"reason": "startup"}],
+    ["on", "input", {"text": PROMPT, "source": "interactive"}],
     ["on", "agent_start", {}],
     ["on", "ui_prompt_start", {"reason": "ui_prompt", "kind": "confirm", "title": "Allow?"}],
     ["on", "ui_prompt_end", {"reason": "ui_prompt", "kind": "confirm", "title": "Allow?"}],
@@ -830,8 +832,9 @@ RUN = [
 ]
 RUN_CALLS = [
     ("session_start", {"reason": "startup", "idle": True}),
+    ("input", {"text": "Fix the login bug"}),
     ("agent_start", {}),
-    ("ui_prompt_start", {"kind": "confirm"}),
+    ("ui_prompt_start", {"kind": "confirm", "title": "Allow?"}),
     ("ui_prompt_end", {}),
     ("plannotator_opened", {"id": "pn-0a1b2c"}),
     ("plannotator_closed", {"id": "pn-0a1b2c"}),
@@ -902,6 +905,70 @@ def test_switchboard_waits_only_on_quit(tmp_path, reason):
             ("session_shutdown", {"reason": reason}),
         ]
     )
+
+
+STARTED = ["on", "session_start", {"reason": "startup"}]
+STARTED_CALL = ("session_start", {"reason": "startup", "idle": True})
+
+
+@needs_strip_types
+def test_switchboard_sends_a_dialogs_title_when_it_has_one(tmp_path):
+    sandbox = SwitchboardSandbox(tmp_path, "node")
+    sandbox.stub()
+    titled = {"reason": "ui_prompt", "kind": "select", "title": "Allow bash: git push?"}
+    untitled = {"reason": "ui_prompt", "kind": "custom"}
+    steps = [
+        STARTED,
+        ["on", "ui_prompt_start", titled],
+        ["on", "ui_prompt_end", titled],
+        ["on", "ui_prompt_start", untitled],
+        ["on", "ui_prompt_end", untitled],
+    ]
+    result = run_switchboard(sandbox, steps)
+    assert result["returned"] == [None] * len(steps)
+    assert sandbox.calls() == hook_calls(
+        [
+            STARTED_CALL,
+            ("ui_prompt_start", {"kind": "select", "title": "Allow bash: git push?"}),
+            ("ui_prompt_end", {}),
+            ("ui_prompt_start", {"kind": "custom"}),
+            ("ui_prompt_end", {}),
+        ]
+    )
+
+
+@needs_strip_types
+@pytest.mark.parametrize(
+    ("text", "line"),
+    [
+        ("Fix the login bug", "Fix the login bug"),
+        ("\n \t\n  Fix the login bug  \nthen run the tests\n", "Fix the login bug"),
+        ("\r\n\r\nFix the login bug\r\nthen run the tests", "Fix the login bug"),
+        ("x" * 500 + "\nmore", "x" * 200),
+        ("x" * 199 + "\U0001f642" * 3, "x" * 199 + "\U0001f642"),
+    ],
+    ids=["one-line", "blank-lines-first", "crlf", "capped", "whole-code-points"],
+)
+def test_switchboard_sends_the_prompts_first_line_capped(tmp_path, text, line):
+    sandbox = SwitchboardSandbox(tmp_path, "node")
+    sandbox.stub()
+    steps = [STARTED, ["on", "input", {"text": text, "source": "interactive"}]]
+    result = run_switchboard(sandbox, steps)
+    assert result["returned"] == [None, None], "Pi awaits input handlers"
+    assert sandbox.calls() == hook_calls([STARTED_CALL, ("input", {"text": line})])
+
+
+@needs_strip_types
+def test_switchboard_sends_nothing_for_a_blank_input(tmp_path):
+    sandbox = SwitchboardSandbox(tmp_path, "node")
+    sandbox.stub()
+    blanks = ["", "   ", "\n\t\r\n \n"]
+    steps = [STARTED] + [
+        ["on", "input", {"text": text, "source": "interactive"}] for text in blanks
+    ]
+    result = run_switchboard(sandbox, steps)
+    assert result["returned"] == [None] * len(steps)
+    assert sandbox.calls() == hook_calls([STARTED_CALL])
 
 
 @needs_strip_types
@@ -1025,8 +1092,9 @@ def test_pi_switchboard_reports_a_real_run(tmp_path):
     assert sandbox.calls() == hook_calls(
         [
             ("session_start", {"reason": "startup", "idle": True}),
+            ("input", {"text": "go"}),
             ("agent_start", {}),
-            ("ui_prompt_start", {"kind": "confirm"}),
+            ("ui_prompt_start", {"kind": "confirm", "title": "Allow?"}),
             ("ui_prompt_end", {}),
             ("agent_settled", {"aborted": False}),
             ("session_shutdown", {"reason": "quit"}),
